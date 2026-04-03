@@ -123,7 +123,7 @@ export default function AppShell() {
           </Chip>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <UserButton afterSignOutUrl="/sign-in" />
+            <UserButton />
           </div>
         </div>
       </aside>
@@ -142,7 +142,7 @@ export default function AppShell() {
           <div className="flex items-center gap-2">
             <Chip variant="soft" size="sm">Beta v0.1</Chip>
             <ThemeToggle />
-            <UserButton afterSignOutUrl="/sign-in" />
+            <UserButton />
           </div>
         </div>
 
