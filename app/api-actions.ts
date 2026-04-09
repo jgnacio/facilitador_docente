@@ -2,9 +2,18 @@
 
 import { auth } from "@clerk/nextjs/server";
 
-const API_URL = process.env.API_URL ?? "http://localhost:8001";
-const ADK_URL = process.env.ADK_URL ?? "http://localhost:8000";
-const ADK_APP = "teacher_agent";
+const API_URL = process.env.API_URL ?? "http://localhost:8000";
+
+// ── Helper: headers con JWT Clerk ─────────────────────────────────────────────
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const { getToken } = await auth();
+  const token = await getToken();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -31,7 +40,10 @@ export type Alumno = {
 
 export async function getPlanificaciones(): Promise<Planificacion[]> {
   try {
-    const res = await fetch(`${API_URL}/planificaciones/`, { cache: "no-store" });
+    const res = await fetch(`${API_URL}/planificaciones/`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   } catch {
@@ -41,7 +53,10 @@ export async function getPlanificaciones(): Promise<Planificacion[]> {
 
 export async function getPlanificacion(id: number): Promise<Planificacion | null> {
   try {
-    const res = await fetch(`${API_URL}/planificaciones/${id}`, { cache: "no-store" });
+    const res = await fetch(`${API_URL}/planificaciones/${id}`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -59,7 +74,7 @@ export async function createPlanificacion(data: {
   try {
     const res = await fetch(`${API_URL}/planificaciones/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authHeaders(),
       body: JSON.stringify(data),
     });
     if (!res.ok) return null;
@@ -71,7 +86,10 @@ export async function createPlanificacion(data: {
 
 export async function deletePlanificacion(id: number): Promise<boolean> {
   try {
-    const res = await fetch(`${API_URL}/planificaciones/${id}`, { method: "DELETE" });
+    const res = await fetch(`${API_URL}/planificaciones/${id}`, {
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
     return res.ok;
   } catch {
     return false;
@@ -82,7 +100,10 @@ export async function deletePlanificacion(id: number): Promise<boolean> {
 
 export async function getAlumnos(): Promise<Alumno[]> {
   try {
-    const res = await fetch(`${API_URL}/alumnos/`, { cache: "no-store" });
+    const res = await fetch(`${API_URL}/alumnos/`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   } catch {
@@ -100,7 +121,7 @@ export async function createAlumno(data: {
   try {
     const res = await fetch(`${API_URL}/alumnos/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authHeaders(),
       body: JSON.stringify(data),
     });
     if (!res.ok) return null;
@@ -110,58 +131,44 @@ export async function createAlumno(data: {
   }
 }
 
-// ── ADK Chat ──────────────────────────────────────────────────────────────────
+// ── Agente chat ───────────────────────────────────────────────────────────────
 
 export type PdfRef = { filename: string; page: number; label: string };
-export type AgentResponse = { text: string; refs: PdfRef[] };
+export type AgentResponse = { text: string; refs: PdfRef[]; session_id: string };
 
-export async function createAdkSession(sessionId: string): Promise<void> {
-  const { userId } = await auth();
-  const adkUser = userId ?? "anonymous";
-  try {
-    await fetch(`${ADK_URL}/apps/${ADK_APP}/users/${adkUser}/sessions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId }),
-    });
-  } catch {
-    // Session may already exist — ignore
-  }
+export async function createAdkSession(_sessionId: string): Promise<void> {
+  // En prod el agente crea la sesión automáticamente en el primer mensaje
+  // Esta función existe por compatibilidad con el componente chat
 }
 
 export async function sendAdkMessage(
   sessionId: string,
   text: string
 ): Promise<AgentResponse> {
-  const { userId } = await auth();
-  const adkUser = userId ?? "anonymous";
   try {
-    const res = await fetch(`${ADK_URL}/run`, {
+    const res = await fetch(`${API_URL}/agente/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        appName: ADK_APP,
-        userId: adkUser,
-        sessionId,
-        newMessage: { role: "user", parts: [{ text }] },
-        stateDelta: {},
-      }),
+      headers: await authHeaders(),
+      body: JSON.stringify({ message: text, session_id: sessionId }),
     });
-    if (!res.ok) return { text: "Error al contactar el agente.", refs: [] };
+    if (!res.ok) return { text: "Error al contactar el agente.", refs: [], session_id: sessionId };
     const data = await res.json();
-    return parseAdkResponse(data);
+    return parseAgentResponse(data);
   } catch (e) {
-    return { text: `Error de conexión: ${e}`, refs: [] };
+    return { text: `Error de conexión: ${e}`, refs: [], session_id: sessionId };
   }
 }
 
 // ── Curriculum estructurado ───────────────────────────────────────────────────
 
-export type CurriculumEstructura = { tramos: Record<string, any> };
+export type CurriculumEstructura = { tramos: Record<string, unknown> };
 
 export async function getCurriculumEstructura(): Promise<CurriculumEstructura> {
   try {
-    const res = await fetch(`${API_URL}/curriculum/estructura`, { cache: "no-store" });
+    const res = await fetch(`${API_URL}/curriculum/estructura`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   } catch {
@@ -169,54 +176,35 @@ export async function getCurriculumEstructura(): Promise<CurriculumEstructura> {
   }
 }
 
-function parseAdkResponse(data: unknown): AgentResponse {
-  const buf: string[] = [];
+// ── Parser respuesta del agente ───────────────────────────────────────────────
 
-  function process(msg: unknown) {
-    if (!msg || typeof msg !== "object") return;
-    const m = msg as Record<string, unknown>;
-    if (typeof m.text === "string") { buf.push(m.text); return; }
-    if (Array.isArray(m.parts)) {
-      for (const p of m.parts) {
-        if (typeof p === "string") buf.push(p);
-        else if (typeof p === "object" && p && typeof (p as Record<string, unknown>).text === "string")
-          buf.push((p as Record<string, unknown>).text as string);
-      }
-      return;
-    }
-    if (m.content && typeof m.content === "object") {
-      const c = m.content as Record<string, unknown>;
-      if (Array.isArray(c.parts)) {
-        for (const p of c.parts) {
-          if (typeof p === "object" && p && typeof (p as Record<string, unknown>).text === "string")
-            buf.push((p as Record<string, unknown>).text as string);
-        }
-        return;
-      }
-      if (typeof c.text === "string") buf.push(c.text);
-    }
+function parseAgentResponse(data: unknown): AgentResponse {
+  if (!data || typeof data !== "object") {
+    return { text: "El agente no respondió.", refs: [], session_id: "" };
   }
 
-  if (Array.isArray(data)) data.forEach(process);
-  else process(data);
+  const d = data as Record<string, unknown>;
+  const session_id = typeof d.session_id === "string" ? d.session_id : "";
+  const raw = typeof d.response === "string" ? d.response.trim() : "";
 
-  const raw = buf.join("").trim() || "El agente no respondió.";
+  if (!raw) return { text: "El agente no respondió.", refs: [], session_id };
 
-  // Try to parse structured JSON from output_schema
+  // El agente usa output_schema → puede venir como JSON string
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.text === "string") {
       const refs: PdfRef[] = Array.isArray(parsed.refs)
         ? (parsed.refs as unknown[]).filter(
             (r): r is PdfRef =>
-              typeof r === "object" && r !== null &&
+              typeof r === "object" &&
+              r !== null &&
               typeof (r as PdfRef).filename === "string" &&
               typeof (r as PdfRef).page === "number"
           )
         : [];
-      return { text: parsed.text, refs };
+      return { text: parsed.text, refs, session_id };
     }
-  } catch { /* not JSON — fall through */ }
+  } catch { /* no es JSON — respuesta plana */ }
 
-  return { text: raw, refs: [] };
+  return { text: raw, refs: [], session_id };
 }
