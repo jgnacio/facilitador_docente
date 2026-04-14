@@ -1,20 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
-
-const PDFDownloadLink = dynamic(
-  () => import("@react-pdf/renderer").then((m) => m.PDFDownloadLink),
-  { ssr: false, loading: () => null }
-);
-const PlanificacionPDF = dynamic(
-  () => import("../pdf/PlanificacionPDF").then((m) => m.PlanificacionPDF),
-  { ssr: false }
-);
-const SecuenciaPDF = dynamic(
-  () => import("../pdf/SecuenciaPDF").then((m) => m.SecuenciaPDF),
-  { ssr: false }
-);
 import {
   Button, Card, Chip, Spinner,
   TextField, Label, Input, TextArea, FieldError,
@@ -286,6 +272,18 @@ function DetailView({ plan, onBack, onEdit, onDelete }: {
 // ── PlanTabla ─────────────────────────────────────────────────────────────────
 
 function PlanTabla({ data, nombre }: { data: PlanEstructurada; nombre: string }) {
+  const handleExportPDF = async () => {
+    const { pdf } = await import("@react-pdf/renderer");
+    const { PlanificacionPDF } = await import("../pdf/PlanificacionPDF");
+    const blob = await pdf(<PlanificacionPDF data={data} nombre={nombre} />).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${nombre.replace(/\s+/g, "_").slice(0, 60)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportCSV = () => {
     const bom = "\uFEFF";
     const headers = ["Momento", "Duración", "Meta de aprendizaje", "Actividad", "Rol docente", "Recursos"];
@@ -323,13 +321,12 @@ function PlanTabla({ data, nombre }: { data: PlanEstructurada; nombre: string })
           >
             <ExportIcon /> Excel
           </button>
-          <PDFDownloadLink
-            document={<PlanificacionPDF data={data} nombre={nombre} />}
-            fileName={`${nombre.replace(/\s+/g, "_").slice(0, 60)}.pdf`}
+          <button
+            onClick={handleExportPDF}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
           >
             <PdfIcon /> PDF
-          </PDFDownloadLink>
+          </button>
         </div>
       </div>
 
@@ -399,6 +396,18 @@ function PlanTabla({ data, nombre }: { data: PlanEstructurada; nombre: string })
 // ── SecuenciaTabla ────────────────────────────────────────────────────────────
 
 function SecuenciaTabla({ data, nombre }: { data: SecuenciaEstructurada; nombre: string }) {
+  const handleExportPDF = async () => {
+    const { pdf } = await import("@react-pdf/renderer");
+    const { SecuenciaPDF } = await import("../pdf/SecuenciaPDF");
+    const blob = await pdf(<SecuenciaPDF data={data} nombre={nombre} />).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${nombre.replace(/\s+/g, "_").slice(0, 60)}_secuencia.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportCSV = () => {
     const bom = "\uFEFF";
     const headers = ["N°", "Recorte", "Meta de aprendizaje", "Plan de aprendizaje", "Recursos"];
@@ -433,13 +442,12 @@ function SecuenciaTabla({ data, nombre }: { data: SecuenciaEstructurada; nombre:
           >
             <ExportIcon /> Excel
           </button>
-          <PDFDownloadLink
-            document={<SecuenciaPDF data={data} nombre={nombre} />}
-            fileName={`${nombre.replace(/\s+/g, "_").slice(0, 60)}_secuencia.pdf`}
+          <button
+            onClick={handleExportPDF}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
           >
             <PdfIcon /> PDF
-          </PDFDownloadLink>
+          </button>
         </div>
       </div>
 

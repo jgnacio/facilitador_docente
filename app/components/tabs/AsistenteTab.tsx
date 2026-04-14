@@ -4,20 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Button, Card } from "@heroui/react";
 import { createAdkSession, type PdfRef } from "../../api-actions";
-import dynamic from "next/dynamic";
-
-const PDFDownloadLink = dynamic(
-  () => import("@react-pdf/renderer").then((m) => m.PDFDownloadLink),
-  { ssr: false, loading: () => null }
-);
-const PlanificacionPDF = dynamic(
-  () => import("../pdf/PlanificacionPDF").then((m) => m.PlanificacionPDF),
-  { ssr: false }
-);
-const SecuenciaPDF = dynamic(
-  () => import("../pdf/SecuenciaPDF").then((m) => m.SecuenciaPDF),
-  { ssr: false }
-);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
 
@@ -513,6 +499,18 @@ function MatchField({ label, value }: { label: string; value: string }) {
 // ── PlanificacionTabla ────────────────────────────────────────────────────────
 
 function PlanificacionTabla({ data }: { data: PlanificacionData }) {
+  const handleExportPDF = async () => {
+    const { pdf } = await import("@react-pdf/renderer");
+    const { PlanificacionPDF } = await import("../pdf/PlanificacionPDF");
+    const blob = await pdf(<PlanificacionPDF data={data} nombre={data.titulo} />).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${data.titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportCSV = () => {
     const bom = "\uFEFF";
     const headers = ["Momento", "Duración", "Actividad", "Rol docente", "Recursos"];
@@ -550,13 +548,12 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
           >
             <ExportIcon /> Excel
           </button>
-          <PDFDownloadLink
-            document={<PlanificacionPDF data={data} nombre={data.titulo} />}
-            fileName={`${data.titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`}
+          <button
+            onClick={handleExportPDF}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
           >
             <PdfIcon /> PDF
-          </PDFDownloadLink>
+          </button>
         </div>
       </div>
 
@@ -612,6 +609,19 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
 // ── SecuenciaTablaInline ──────────────────────────────────────────────────────
 
 function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
+  const handleExportPDF = async () => {
+    const titulo = `${data.espacio} — ${data.unidad_curricular}`;
+    const { pdf } = await import("@react-pdf/renderer");
+    const { SecuenciaPDF } = await import("../pdf/SecuenciaPDF");
+    const blob = await pdf(<SecuenciaPDF data={data} nombre={titulo} />).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportCSV = () => {
     const bom = "\uFEFF";
     const headers = ["N°", "Recorte", "Meta de aprendizaje", "Plan de aprendizaje", "Recursos"];
@@ -641,13 +651,12 @@ function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
         >
           <ExportIcon /> Excel
         </button>
-        <PDFDownloadLink
-          document={<SecuenciaPDF data={data} nombre={titulo} />}
-          fileName={`${titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`}
+        <button
+          onClick={handleExportPDF}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
         >
           <PdfIcon /> PDF
-        </PDFDownloadLink>
+        </button>
       </div>
 
       {/* Encabezado curricular */}
