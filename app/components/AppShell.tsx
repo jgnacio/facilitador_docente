@@ -6,9 +6,9 @@ import { UserButton } from "@clerk/nextjs";
 import { Button, Card, Chip, Separator } from "@heroui/react";
 import {
   LayoutDashboard,
-  FileText,
+  FolderOpen,
   Users,
-  MessageSquare,
+  Sparkles,
   BookOpen,
   Sun,
   Moon,
@@ -44,12 +44,12 @@ function Icon({ icon, size = 16, stroke = "currentColor", strokeWidth = 2 }: Ico
   );
 }
 
-const NAV: { id: Tab; label: string; icon: IconNode }[] = [
-  { id: "dashboard",       label: "Inicio",          icon: LayoutDashboard },
-  { id: "planificaciones", label: "Planificaciones",  icon: FileText        },
-  { id: "alumnos",         label: "Alumnos",          icon: Users           },
-  { id: "asistente",       label: "Asistente",        icon: MessageSquare   },
-  { id: "programa",        label: "Programa",         icon: BookOpen        },
+const NAV: { id: Tab; label: string; icon: IconNode; sublabel?: string }[] = [
+  { id: "dashboard",       label: "Inicio",              icon: LayoutDashboard },
+  { id: "asistente",       label: "Planificador IA",     icon: Sparkles,   sublabel: "Crear" },
+  { id: "planificaciones", label: "Mis Planificaciones", icon: FolderOpen                    },
+  { id: "alumnos",         label: "Alumnos",             icon: Users                         },
+  { id: "programa",        label: "Programa",            icon: BookOpen                      },
 ];
 
 function ThemeToggle() {
@@ -110,7 +110,15 @@ export default function AppShell() {
                 ].join(" ")}
               >
                 <Icon icon={item.icon} />
-                {item.label}
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.sublabel && (
+                  <span className={[
+                    "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+                    isActive ? "bg-accent/20 text-accent" : "bg-muted text-muted-foreground",
+                  ].join(" ")}>
+                    {item.sublabel}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -149,7 +157,7 @@ export default function AppShell() {
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto">
           {activeTab === "dashboard"       && <DashboardTab onNavigate={(t) => setActiveTab(t as Tab)} />}
-          {activeTab === "planificaciones" && <PlanificacionesTab />}
+          {activeTab === "planificaciones" && <PlanificacionesTab onGoToPlanificador={() => setActiveTab("asistente")} />}
           {activeTab === "alumnos"         && <AlumnosTab />}
           {activeTab === "asistente"       && (
             <div className="flex flex-col" style={{ height: "100%" }}>

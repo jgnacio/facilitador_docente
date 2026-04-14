@@ -12,7 +12,7 @@ import {
   type Planificacion,
 } from "../../api-actions";
 
-type View = "list" | "create" | "detail" | "edit";
+type View = "list" | "detail" | "edit";
 
 const NIVELES = [
   "Inicial - Nivel 3", "Inicial - Nivel 4", "Inicial - Nivel 5",
@@ -92,7 +92,7 @@ function parseChatExportado(raw: string): PlanParsed | null {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function PlanificacionesTab() {
+export default function PlanificacionesTab({ onGoToPlanificador }: { onGoToPlanificador: () => void }) {
   const [view, setView]         = useState<View>("list");
   const [plans, setPlans]       = useState<Planificacion[]>([]);
   const [selected, setSelected] = useState<Planificacion | null>(null);
@@ -122,9 +122,6 @@ export default function PlanificacionesTab() {
     reload();
   };
 
-  if (view === "create") {
-    return <PlanForm onBack={() => setView("list")} onSaved={() => { setView("list"); reload(); }} />;
-  }
   if (view === "edit" && selected) {
     return (
       <PlanForm
@@ -151,11 +148,11 @@ export default function PlanificacionesTab() {
         <div>
           <h2 className="text-xl font-bold text-foreground">Mis Planificaciones</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {loading ? "Cargando…" : `${plans.length} planificación${plans.length !== 1 ? "es" : ""}`}
+            {loading ? "Cargando…" : `${plans.length} planificación${plans.length !== 1 ? "es" : ""} guardada${plans.length !== 1 ? "s" : ""}`}
           </p>
         </div>
-        <Button variant="primary" size="sm" onPress={() => setView("create")}>
-          <PlusIcon /> Nueva
+        <Button variant="primary" size="sm" onPress={onGoToPlanificador}>
+          <SparklesIcon /> Planificador IA
         </Button>
       </div>
 
@@ -169,13 +166,18 @@ export default function PlanificacionesTab() {
       ) : plans.length === 0 ? (
         <Card variant="transparent" className="border border-dashed border-border p-12 flex flex-col items-center gap-4 text-center">
           <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center text-accent">
-            <DocIcon size={28} />
+            <SparklesIcon size={28} />
           </div>
           <div>
-            <p className="font-semibold text-foreground">No hay planificaciones aún</p>
-            <p className="text-sm text-muted-foreground mt-1">Creá tu primera planificación o generala con el asistente.</p>
+            <p className="font-semibold text-foreground">Todavía no tenés planificaciones guardadas</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Usá el <strong>Planificador IA</strong> para crear tu primera planificación.<br />
+              El asistente te guía paso a paso y la guarda acá automáticamente.
+            </p>
           </div>
-          <Button variant="primary" onPress={() => setView("create")}>+ Nueva planificación</Button>
+          <Button variant="primary" onPress={onGoToPlanificador}>
+            <SparklesIcon /> Ir al Planificador IA
+          </Button>
         </Card>
       ) : (
         <div className="space-y-2">
@@ -673,19 +675,20 @@ function PlanForm({ plan, onBack, onSaved }: {
 }
 
 // ── Iconos ────────────────────────────────────────────────────────────────────
+function SparklesIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+      <path d="M20 3v4m2-2h-4M4 17v2m1-1H3"/>
+    </svg>
+  );
+}
 function DocIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <polyline points="14 2 14 8 20 8" />
       <line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
-    </svg>
-  );
-}
-function PlusIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
-      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   );
 }
