@@ -131,6 +131,58 @@ export async function createAlumno(data: {
   }
 }
 
+export async function updateAlumno(id: number, data: {
+  nombre_completo?: string;
+  fecha_nacimiento?: string;
+  nivel?: string;
+  grado?: string;
+  notas?: string;
+}): Promise<Alumno | null> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${id}`, {
+      method: "PUT",
+      headers: await authHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteAlumno(id: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${id}`, {
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function updatePlanificacion(id: number, data: {
+  nombre?: string;
+  descripcion?: string;
+  nivel?: string;
+  periodo_inicio?: string;
+  periodo_fin?: string;
+}): Promise<Planificacion | null> {
+  try {
+    const res = await fetch(`${API_URL}/planificaciones/${id}`, {
+      method: "PUT",
+      headers: await authHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 // ── Agente chat ───────────────────────────────────────────────────────────────
 
 export type PdfRef = { filename: string; page: number; label: string };

@@ -6,7 +6,7 @@ import {
   TextField, Label, Input, TextArea, FieldError,
   Select, ListBox,
 } from "@heroui/react";
-import { getAlumnos, createAlumno, type Alumno } from "../../api-actions";
+import { getAlumnos, createAlumno, updateAlumno, deleteAlumno, type Alumno } from "../../api-actions";
 
 const NIVELES = ["Inicial", "Primaria", "Secundaria"];
 const GRADOS = [
@@ -25,13 +25,14 @@ function avatarColor(name: string): "default" | "accent" | "success" | "warning"
   return COLORS[Math.abs(h) % COLORS.length];
 }
 
-type View = "list" | "create";
+type View = "list" | "create" | "edit";
 
 export default function AlumnosTab() {
-  const [view, setView] = useState<View>("list");
-  const [alumnos, setAlumnos] = useState<Alumno[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [view, setView]         = useState<View>("list");
+  const [alumnos, setAlumnos]   = useState<Alumno[]>([]);
+  const [editing, setEditing]   = useState<Alumno | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState("");
 
   const reload = () => {
     setLoading(true);
@@ -44,11 +45,29 @@ export default function AlumnosTab() {
     a.nombre_completo.toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleEdit = (a: Alumno) => { setEditing(a); setView("edit"); };
+
+  const handleDelete = async (a: Alumno) => {
+    if (!confirm(`¿Eliminar a ${a.nombre_completo}? Esta acción no se puede deshacer.`)) return;
+    await deleteAlumno(a.id);
+    reload();
+  };
+
   if (view === "create") {
     return (
-      <CreateForm
+      <AlumnoForm
         onBack={() => setView("list")}
         onSaved={() => { setView("list"); reload(); }}
+      />
+    );
+  }
+
+  if (view === "edit" && editing) {
+    return (
+      <AlumnoForm
+        alumno={editing}
+        onBack={() => { setView("list"); setEditing(null); }}
+        onSaved={() => { setView("list"); setEditing(null); reload(); }}
       />
     );
   }
@@ -95,7 +114,14 @@ export default function AlumnosTab() {
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {filtered.map((a) => <AlumnoCard key={a.id} alumno={a} />)}
+          {filtered.map((a) => (
+            <AlumnoCard
+              key={a.id}
+              alumno={a}
+              onEdit={() => handleEdit(a)}
+              onDelete={() => handleDelete(a)}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -104,7 +130,11 @@ export default function AlumnosTab() {
 
 // ── Alumno card ───────────────────────────────────────────────────────────────
 
-function AlumnoCard({ alumno }: { alumno: Alumno }) {
+function AlumnoCard({ alumno, onEdit, onDelete }: {
+  alumno: Alumno;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const sub = [alumno.nivel, alumno.grado].filter(Boolean).join(" · ");
   return (
     <Card variant="default" className="flex flex-row items-start gap-3 p-4">
@@ -122,33 +152,58 @@ function AlumnoCard({ alumno }: { alumno: Alumno }) {
           <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{alumno.notas}</p>
         )}
       </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          onClick={onEdit}
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+          aria-label="Editar alumno"
+        >
+          <EditIcon />
+        </button>
+        <button
+          onClick={onDelete}
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-all"
+          aria-label="Eliminar alumno"
+        >
+          <TrashIcon />
+        </button>
+      </div>
     </Card>
   );
 }
 
-// ── Create form ───────────────────────────────────────────────────────────────
+// ── Alumno form (create + edit) ───────────────────────────────────────────────
 
-function CreateForm({ onBack, onSaved }: { onBack: () => void; onSaved: () => void }) {
-  const [nombre, setNombre] = useState("");
-  const [nacimiento, setNacimiento] = useState("");
-  const [nivel, setNivel] = useState("");
-  const [grado, setGrado] = useState("");
-  const [notas, setNotas] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [touched, setTouched] = useState(false);
+function AlumnoForm({ alumno, onBack, onSaved }: {
+  alumno?: Alumno;
+  onBack: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = Boolean(alumno);
+  const [nombre, setNombre]       = useState(alumno?.nombre_completo ?? "");
+  const [nacimiento, setNacimiento] = useState(alumno?.fecha_nacimiento ?? "");
+  const [nivel, setNivel]         = useState(alumno?.nivel ?? "");
+  const [grado, setGrado]         = useState(alumno?.grado ?? "");
+  const [notas, setNotas]         = useState(alumno?.notas ?? "");
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState("");
+  const [touched, setTouched]     = useState(false);
 
   const save = async () => {
     setTouched(true);
     if (!nombre.trim()) return;
     setSaving(true);
-    const result = await createAlumno({
+    setError("");
+    const data = {
       nombre_completo: nombre.trim(),
       fecha_nacimiento: nacimiento.trim() || undefined,
       nivel: nivel || undefined,
       grado: grado || undefined,
       notas: notas.trim() || undefined,
-    });
+    };
+    const result = isEdit && alumno
+      ? await updateAlumno(alumno.id, data)
+      : await createAlumno(data);
     setSaving(false);
     if (result) onSaved();
     else setError("Error al guardar. Verificá que la API esté activa.");
@@ -160,7 +215,9 @@ function CreateForm({ onBack, onSaved }: { onBack: () => void; onSaved: () => vo
         <Button variant="ghost" isIconOnly size="sm" onPress={onBack}>
           <BackIcon />
         </Button>
-        <h2 className="text-xl font-bold text-foreground">Nuevo Alumno</h2>
+        <h2 className="text-xl font-bold text-foreground">
+          {isEdit ? "Editar Alumno" : "Nuevo Alumno"}
+        </h2>
       </div>
 
       <div className="space-y-4">
@@ -244,7 +301,9 @@ function CreateForm({ onBack, onSaved }: { onBack: () => void; onSaved: () => vo
         <div className="flex gap-3 pt-2">
           <Button variant="tertiary" fullWidth onPress={onBack}>Cancelar</Button>
           <Button variant="primary" fullWidth isPending={saving} onPress={save}>
-            {({ isPending }) => isPending ? <><Spinner size="sm" color="current" /> Guardando…</> : "Guardar Alumno"}
+            {({ isPending }) => isPending
+              ? <><Spinner size="sm" color="current" /> Guardando…</>
+              : isEdit ? "Guardar cambios" : "Guardar Alumno"}
           </Button>
         </div>
       </div>
@@ -273,6 +332,22 @@ function BackIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <path d="M15 19l-7-7 7-7" />
+    </svg>
+  );
+}
+function EditIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </svg>
+  );
+}
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
     </svg>
   );
 }
