@@ -4,6 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Button, Card } from "@heroui/react";
 import { createAdkSession, type PdfRef } from "../../api-actions";
+import dynamic from "next/dynamic";
+
+const PDFDownloadLink = dynamic(
+  () => import("@react-pdf/renderer").then((m) => m.PDFDownloadLink),
+  { ssr: false, loading: () => null }
+);
+const PlanificacionPDF = dynamic(
+  () => import("../pdf/PlanificacionPDF").then((m) => m.PlanificacionPDF),
+  { ssr: false }
+);
+const SecuenciaPDF = dynamic(
+  () => import("../pdf/SecuenciaPDF").then((m) => m.SecuenciaPDF),
+  { ssr: false }
+);
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
 
@@ -529,12 +543,21 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
           <p className="font-bold text-sm text-foreground leading-snug">{data.titulo}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{data.grupo}</p>
         </div>
-        <button
-          onClick={exportCSV}
-          className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-        >
-          <ExportIcon /> Exportar CSV
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={exportCSV}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+          >
+            <ExportIcon /> Excel
+          </button>
+          <PDFDownloadLink
+            document={<PlanificacionPDF data={data} nombre={data.titulo} />}
+            fileName={`${data.titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+          >
+            <PdfIcon /> PDF
+          </PDFDownloadLink>
+        </div>
       </div>
 
       {/* Justificación */}
@@ -589,8 +612,44 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
 // ── SecuenciaTablaInline ──────────────────────────────────────────────────────
 
 function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
+  const exportCSV = () => {
+    const bom = "\uFEFF";
+    const headers = ["N°", "Recorte", "Meta de aprendizaje", "Plan de aprendizaje", "Recursos"];
+    const rows = data.actividades.map((a) => [
+      String(a.numero), a.recorte, a.meta_aprendizaje,
+      a.plan_aprendizaje.join("\n"), a.recursos ?? "",
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `secuencia.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const titulo = `${data.espacio} — ${data.unidad_curricular}`;
+
   return (
     <Card variant="secondary" className="p-4 rounded-2xl space-y-4 w-full">
+      {/* Botones de exportación */}
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={exportCSV}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+        >
+          <ExportIcon /> Excel
+        </button>
+        <PDFDownloadLink
+          document={<SecuenciaPDF data={data} nombre={titulo} />}
+          fileName={`${titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+        >
+          <PdfIcon /> PDF
+        </PDFDownloadLink>
+      </div>
+
       {/* Encabezado curricular */}
       <div className="rounded-xl border border-border overflow-hidden text-xs">
         <div className="grid grid-cols-2 border-b border-border">
@@ -778,20 +837,22 @@ function CopyIcon() {
     </svg>
   );
 }
-function PdfIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-    </svg>
-  );
-}
 function ExportIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+function PdfIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="9" y1="13" x2="15" y2="13" />
+      <line x1="9" y1="17" x2="15" y2="17" />
     </svg>
   );
 }

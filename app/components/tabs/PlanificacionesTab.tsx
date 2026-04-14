@@ -1,6 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+
+const PDFDownloadLink = dynamic(
+  () => import("@react-pdf/renderer").then((m) => m.PDFDownloadLink),
+  { ssr: false, loading: () => null }
+);
+const PlanificacionPDF = dynamic(
+  () => import("../pdf/PlanificacionPDF").then((m) => m.PlanificacionPDF),
+  { ssr: false }
+);
+const SecuenciaPDF = dynamic(
+  () => import("../pdf/SecuenciaPDF").then((m) => m.SecuenciaPDF),
+  { ssr: false }
+);
 import {
   Button, Card, Chip, Spinner,
   TextField, Label, Input, TextArea, FieldError,
@@ -302,12 +316,21 @@ function PlanTabla({ data, nombre }: { data: PlanEstructurada; nombre: string })
           <p className="font-bold text-sm text-foreground leading-snug">{data.titulo}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{data.grupo}</p>
         </div>
-        <button
-          onClick={exportCSV}
-          className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-        >
-          <ExportIcon /> Exportar CSV
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={exportCSV}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+          >
+            <ExportIcon /> Excel
+          </button>
+          <PDFDownloadLink
+            document={<PlanificacionPDF data={data} nombre={nombre} />}
+            fileName={`${nombre.replace(/\s+/g, "_").slice(0, 60)}.pdf`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+          >
+            <PdfIcon /> PDF
+          </PDFDownloadLink>
+        </div>
       </div>
 
       {/* Justificación */}
@@ -403,12 +426,21 @@ function SecuenciaTabla({ data, nombre }: { data: SecuenciaEstructurada; nombre:
       {/* Header con export */}
       <div className="flex items-start justify-between gap-3">
         <p className="font-bold text-sm text-foreground leading-snug">{nombre}</p>
-        <button
-          onClick={exportCSV}
-          className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-        >
-          <ExportIcon /> Exportar CSV
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={exportCSV}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+          >
+            <ExportIcon /> Excel
+          </button>
+          <PDFDownloadLink
+            document={<SecuenciaPDF data={data} nombre={nombre} />}
+            fileName={`${nombre.replace(/\s+/g, "_").slice(0, 60)}_secuencia.pdf`}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+          >
+            <PdfIcon /> PDF
+          </PDFDownloadLink>
+        </div>
       </div>
 
       {/* Tabla de encabezado curricular */}
@@ -685,6 +717,16 @@ function ExportIcon() {
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+function PdfIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="9" y1="13" x2="15" y2="13" />
+      <line x1="9" y1="17" x2="15" y2="17" />
     </svg>
   );
 }
