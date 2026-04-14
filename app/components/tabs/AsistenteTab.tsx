@@ -26,9 +26,30 @@ type CurriculumMatch = {
 type PlanificacionMomento = {
   momento: string;
   duracion: string;
+  meta_aprendizaje?: string;
   actividad: string;
   rol_docente: string;
   recursos: string;
+};
+
+type SecuenciaActividad = {
+  numero: number;
+  recorte: string;
+  meta_aprendizaje: string;
+  plan_aprendizaje: string[];
+  recursos?: string;
+};
+
+type SecuenciaData = {
+  espacio: string;
+  unidad_curricular: string;
+  competencias_generales: string[];
+  competencias_especificas: string[];
+  criterios_de_logro: string[];
+  meta_aprendizaje: string;
+  contenido: string;
+  evaluaciones?: string;
+  actividades: SecuenciaActividad[];
 };
 
 type PlanificacionData = {
@@ -55,6 +76,7 @@ type Message = {
   refs: PdfRef[];
   curriculum_match?: CurriculumMatch;
   planificacion?: PlanificacionData;
+  secuencia?: SecuenciaData;
 };
 
 // ── Token parsers ─────────────────────────────────────────────────────────────
@@ -84,6 +106,7 @@ function parseAgentResponse(data: unknown): {
   refs: PdfRef[];
   curriculum_match?: CurriculumMatch;
   planificacion?: PlanificacionData;
+  secuencia?: SecuenciaData;
 } {
   if (!data || typeof data !== "object") return { text: "El agente no respondió.", refs: [] };
   const d = data as Record<string, unknown>;
@@ -105,6 +128,7 @@ function parseAgentResponse(data: unknown): {
         refs,
         curriculum_match: parsed.curriculum_match ?? undefined,
         planificacion: parsed.planificacion ?? undefined,
+        secuencia: parsed.secuencia ?? undefined,
       };
     }
   } catch { /* respuesta plana */ }
@@ -203,6 +227,7 @@ export default function AsistenteTab() {
               refs: reply.refs,
               curriculum_match: reply.curriculum_match,
               planificacion: reply.planificacion,
+              secuencia: reply.secuencia,
             }]);
             setLoading(false);
           } else if (evt.type === "error") {
@@ -347,6 +372,11 @@ function Bubble({ message, onOptionClick }: { message: Message; onOptionClick: (
         {/* Planificacion table */}
         {!isUser && message.planificacion && (
           <PlanificacionTabla data={message.planificacion} />
+        )}
+
+        {/* Secuencia de actividades */}
+        {!isUser && message.secuencia && (
+          <SecuenciaTablaInline data={message.secuencia} />
         )}
 
         {/* Bubble body — always shown, contains conversational text */}
@@ -521,7 +551,7 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
         <table className="w-full text-xs border-collapse min-w-[480px]">
           <thead>
             <tr className="border-b border-border">
-              {["Momento", "Duración", "Actividad", "Rol docente", "Recursos"].map((h) => (
+              {["Momento", "Duración", "Meta de aprendizaje", "Actividad", "Rol docente", "Recursos"].map((h) => (
                 <th key={h} className="text-left py-2 pr-3 first:pl-1 font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -535,6 +565,7 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
                   </span>
                 </td>
                 <td className="py-3 pr-3 text-muted-foreground whitespace-nowrap">{m.duracion}</td>
+                <td className="py-3 pr-3 leading-relaxed font-medium text-foreground/90">{m.meta_aprendizaje ?? <span className="text-muted-foreground/40 italic">—</span>}</td>
                 <td className="py-3 pr-3 leading-relaxed">{m.actividad}</td>
                 <td className="py-3 pr-3 leading-relaxed text-muted-foreground">{m.rol_docente}</td>
                 <td className="py-3 leading-relaxed text-muted-foreground">{m.recursos}</td>
@@ -550,6 +581,99 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
         <p><strong className="text-foreground">Contenido:</strong> {data.contenido}</p>
         <p><strong className="text-foreground">Criterio de logro:</strong> {data.criterio_de_logro}</p>
         <p className="text-foreground/50">{data.espacio} · {data.unidad} · Tramo {data.tramo}</p>
+      </div>
+    </Card>
+  );
+}
+
+// ── SecuenciaTablaInline ──────────────────────────────────────────────────────
+
+function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
+  return (
+    <Card variant="secondary" className="p-4 rounded-2xl space-y-4 w-full">
+      {/* Encabezado curricular */}
+      <div className="rounded-xl border border-border overflow-hidden text-xs">
+        <div className="grid grid-cols-2 border-b border-border">
+          <div className="px-3 py-2 border-r border-border">
+            <span className="font-semibold uppercase tracking-wide text-muted-foreground">Espacio: </span>
+            <span className="text-foreground">{data.espacio}</span>
+          </div>
+          <div className="px-3 py-2">
+            <span className="font-semibold uppercase tracking-wide text-muted-foreground">Unidad curricular: </span>
+            <span className="text-foreground">{data.unidad_curricular}</span>
+          </div>
+        </div>
+        {data.competencias_generales.length > 0 && (
+          <div className="px-3 py-2 border-b border-border">
+            <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1">Competencias generales:</p>
+            <ul className="space-y-0.5 pl-3">
+              {data.competencias_generales.map((c, i) => <li key={i} className="text-foreground/80 list-disc">{c}</li>)}
+            </ul>
+          </div>
+        )}
+        {data.competencias_especificas.length > 0 && (
+          <div className="px-3 py-2 border-b border-border">
+            <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1">Competencias específicas:</p>
+            <ul className="space-y-0.5 pl-3">
+              {data.competencias_especificas.map((c, i) => <li key={i} className="text-foreground/80 list-disc">{c}</li>)}
+            </ul>
+          </div>
+        )}
+        {data.criterios_de_logro.length > 0 && (
+          <div className="px-3 py-2 border-b border-border">
+            <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1">Criterios de logro:</p>
+            <ul className="space-y-0.5 pl-3">
+              {data.criterios_de_logro.map((c, i) => <li key={i} className="text-foreground/80 list-disc">{c}</li>)}
+            </ul>
+          </div>
+        )}
+        {data.meta_aprendizaje && (
+          <div className="px-3 py-2 border-b border-border bg-accent/5">
+            <span className="font-semibold uppercase tracking-wide text-accent">Meta de aprendizaje: </span>
+            <span className="text-foreground/90">{data.meta_aprendizaje}</span>
+          </div>
+        )}
+        {data.contenido && (
+          <div className="px-3 py-2">
+            <span className="font-semibold uppercase tracking-wide text-muted-foreground">Contenido: </span>
+            <span className="text-foreground/80">{data.contenido}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Tabla de actividades */}
+      <div className="overflow-x-auto -mx-1">
+        <table className="w-full text-xs border-collapse min-w-[600px] border border-border rounded-xl overflow-hidden">
+          <thead>
+            <tr className="bg-muted/50">
+              {["ACT.", "RECORTE", "META DE APRENDIZAJE", "PLAN DE APRENDIZAJE", "RECURSOS"].map((h) => (
+                <th key={h} className="text-left py-2 px-3 font-semibold text-muted-foreground uppercase tracking-wide border-b border-border whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.actividades.map((act, i) => (
+              <tr key={i} className="border-b border-border/40 align-top">
+                <td className="py-3 px-3 font-bold text-foreground whitespace-nowrap">{act.numero}.</td>
+                <td className="py-3 px-3 text-foreground/80 leading-relaxed min-w-[120px]">{act.recorte}</td>
+                <td className="py-3 px-3 text-foreground/80 leading-relaxed min-w-[160px]">{act.meta_aprendizaje}</td>
+                <td className="py-3 px-3 leading-relaxed min-w-[240px]">
+                  <ul className="space-y-1">
+                    {act.plan_aprendizaje.map((paso, j) => (
+                      <li key={j} className="flex gap-2 text-foreground/80">
+                        <span className="text-muted-foreground shrink-0">-</span>
+                        <span>{paso}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </td>
+                <td className="py-3 px-3 text-muted-foreground leading-relaxed min-w-[100px]">
+                  {act.recursos || <span className="text-muted-foreground/30">—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </Card>
   );
