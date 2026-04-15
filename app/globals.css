@@ -1,19 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 @import "@heroui/styles";
 
-/* ── ANEP / EBI brand colors — light ────────────────────────────────────── */
+/* ── Educational Editorial — Brand tokens ────────────────────────────────── */
 :root {
-  --accent: oklch(0.4204 0.185 253.83);
+  /* Primary orange */
+  --accent: oklch(0.65 0.20 40);
   --accent-foreground: oklch(0.98 0 0);
+
+  /* Semantic */
   --success: oklch(0.4 0.14 145);
   --success-foreground: oklch(0.98 0 0);
-  --surface: oklch(0.97 0 0);
+
+  /* Surfaces */
+  --surface: #F8F9FA;
+  --surface-container-low: #F1F4F5;
+  --surface-container-lowest: #FFFFFF;
+  --surface-container-high: #E5E9EB;
 }
 
 /* ── dark mode overrides ─────────────────────────────────────────────────── */
 .dark {
-  --accent: oklch(0.62 0.18 253.83);
-  --surface: oklch(0.13 0 0);
+  --accent: oklch(0.72 0.20 40);
+  --surface: #0f172a;
+  --surface-container-low: #111827;
+  --surface-container-lowest: #1e293b;
+  --surface-container-high: #0a0f1a;
 }
 
 html,
@@ -25,6 +37,8 @@ body {
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--surface);
+  font-family: 'Inter', sans-serif;
 }
 
 * {
