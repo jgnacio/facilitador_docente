@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { useClerk, useUser, UserButton } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import {
@@ -12,7 +13,6 @@ import {
   Plus,
   HelpCircle,
   LogOut,
-  Search,
   Sun,
   Moon,
 } from "lucide-react";
@@ -24,12 +24,12 @@ import ProgramaTab from "./tabs/ProgramaTab";
 
 export type Tab = "dashboard" | "planificaciones" | "alumnos" | "asistente" | "programa";
 
-const NAV: { id: Tab; label: string; Icon: React.ElementType }[] = [
-  { id: "dashboard",       label: "Dashboard",          Icon: LayoutDashboard },
-  { id: "asistente",       label: "Planificador IA",    Icon: Sparkles        },
-  { id: "planificaciones", label: "Mis Planificaciones", Icon: Folder          },
-  { id: "alumnos",         label: "Alumnos",            Icon: Users           },
-  { id: "programa",        label: "Programa",           Icon: ClipboardList   },
+const NAV: { id: Tab; label: string; mobileLabel: string; Icon: React.ElementType }[] = [
+  { id: "dashboard",       label: "Dashboard",           mobileLabel: "Inicio",   Icon: LayoutDashboard },
+  { id: "asistente",       label: "Planificador IA",     mobileLabel: "IA",       Icon: Sparkles        },
+  { id: "planificaciones", label: "Mis Planificaciones", mobileLabel: "Planes",   Icon: Folder          },
+  { id: "alumnos",         label: "Alumnos",             mobileLabel: "Alumnos",  Icon: Users           },
+  { id: "programa",        label: "Programa",            mobileLabel: "Programa", Icon: ClipboardList   },
 ];
 
 // ── Theme toggle ──────────────────────────────────────────────────────────────
@@ -46,10 +46,19 @@ function ThemeToggle() {
     <button
       onClick={() => setTheme(isDark ? "light" : "dark")}
       aria-label="Cambiar tema"
-      className="rounded-full transition-all active:scale-95"
-      style={{ padding: "0.5rem", color: "#94a3b8" }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = isDark ? "rgba(255,255,255,0.08)" : "#F1F5F9"; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+      className="rounded-xl transition-all active:scale-95"
+      style={{
+        padding: "0.5rem",
+        color: isDark ? "var(--on-surface-variant)" : "var(--on-surface-variant)",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = isDark
+          ? "rgba(255,182,143,0.10)"
+          : "rgba(156,68,0,0.06)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+      }}
     >
       {isDark ? <Sun size={18} /> : <Moon size={18} />}
     </button>
@@ -64,72 +73,98 @@ export default function AppShell() {
   const { signOut } = useClerk();
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   const isDark = mounted && resolvedTheme === "dark";
 
-  const sidebarBg  = isDark ? "#111827" : "#F8F9FA";
-  const topBarBg   = isDark ? "rgba(17,24,39,0.80)" : "rgba(255,255,255,0.75)";
-  const mainBg     = isDark ? "#0f172a" : "#F8F9FA";
-  const activeNavBg = isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF";
-  const inactiveText = isDark ? "#94a3b8" : "#475569";
-  const hoverBg    = isDark ? "rgba(242,116,5,0.10)" : "#FFF7ED";
-  const dividerColor = isDark ? "rgba(255,255,255,0.08)" : "#e2e8f0";
-  const logoTitle  = isDark ? "#f1f5f9" : "#0f172a";
-  const logoSub    = isDark ? "#64748b" : "#64748b";
-  const searchBg   = isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9";
-  const searchFocusBg = isDark ? "rgba(255,255,255,0.10)" : "#FFFFFF";
-  const searchTextColor = isDark ? "#f1f5f9" : "#1e293b";
-  const userNameColor = isDark ? "#f1f5f9" : "#1e293b";
+  // ── Design tokens ──────────────────────────────────────────────────────────
+  // Glassmorphism sidebar (The "Glass & Gradient" Rule)
+  const sidebarBg = isDark
+    ? "rgba(16, 18, 19, 0.88)"
+    : "rgba(255, 255, 255, 0.85)";
+
+  const topBarBg = isDark
+    ? "rgba(10, 12, 14, 0.82)"
+    : "rgba(255, 255, 255, 0.80)";
+
+  const mainBg = isDark ? "#101213" : "#f9f9fd";
+
+  // Surface-container-lowest for active nav
+  const activeNavBg = isDark
+    ? "rgba(255, 182, 143, 0.10)"
+    : "rgba(156, 68, 0, 0.06)";
+
+  const activeColor  = isDark ? "oklch(0.72 0.16 38)" : "#F27405";
+  const inactiveText = isDark ? "#d3bcaf" : "#574238";
+
+  const hoverBg = isDark
+    ? "rgba(200, 100, 50, 0.12)"
+    : "rgba(242, 116, 5, 0.08)";
+
+  const userNameColor = isDark ? "#e2e0dd" : "#191c1e";
+
+  const ctaGradient = isDark ? "oklch(0.72 0.16 38)" : "#F27405";
+  const ctaShadow   = isDark
+    ? "0 4px 20px rgba(200, 100, 50, 0.35)"
+    : "0 4px 20px rgba(242, 116, 5, 0.22)";
 
   return (
     <div style={{ background: mainBg, minHeight: "100vh" }}>
 
-      {/* ── Sidebar ───────────────────────────────────────────────────────── */}
+      {/* ── Sidebar (desktop) ────────────────────────────────────────────── */}
       <aside
-        className="fixed left-0 top-0 h-screen flex flex-col z-50 transition-colors duration-300"
+        className="hidden md:flex fixed left-0 top-0 h-screen flex-col z-50 transition-all duration-300"
         style={{
           width: "256px",
           background: sidebarBg,
-          borderRadius: "0 3rem 3rem 0",
-          padding: "1.5rem",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          padding: "1.75rem 1.25rem",
+          // Ambient shadow instead of border
+          boxShadow: isDark
+            ? "4px 0 40px rgba(0, 0, 0, 0.20)"
+            : "4px 0 40px rgba(25, 28, 30, 0.06)",
         }}
       >
         {/* Logo */}
-        <div className="flex flex-col gap-1 mb-10 px-4">
-          <h1
-            className="text-lg font-black tracking-tight"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: logoTitle }}
-          >
-            Facilitador
-          </h1>
-          <p
-            className="text-xs font-semibold uppercase tracking-widest"
-            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: logoSub }}
-          >
-            Docente EBI
-          </p>
+        <div className="flex items-center justify-center mb-10 px-3">
+          <Image
+            src={isDark ? "/logo_dark.png" : "/logo.png"}
+            alt="Facilitador Docente"
+            width={156}
+            height={44}
+            style={{ objectFit: "contain", objectPosition: "left center" }}
+            priority
+          />
         </div>
 
         {/* Nav */}
-        <nav className="flex flex-col gap-2 flex-grow">
+        <nav className="flex flex-col gap-1 flex-grow">
           {NAV.map(({ id, label, Icon }) => {
             const isActive = activeTab === id;
             return (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className="flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-full transition-all duration-200 w-full"
+                className="flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-2xl transition-all duration-200 w-full"
                 style={{
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  fontFamily: "var(--font-display)",
                   background: isActive ? activeNavBg : "transparent",
-                  color: isActive ? "#F27405" : inactiveText,
-                  boxShadow: isActive && !isDark ? "0 1px 4px rgba(0,0,0,0.08)" : "none",
+                  color: isActive ? activeColor : inactiveText,
+                  letterSpacing: "-0.01em",
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
                     (e.currentTarget as HTMLButtonElement).style.background = hoverBg;
-                    (e.currentTarget as HTMLButtonElement).style.color = "#F27405";
+                    (e.currentTarget as HTMLButtonElement).style.color = activeColor;
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -139,37 +174,55 @@ export default function AppShell() {
                   }
                 }}
               >
-                <Icon size={18} strokeWidth={2} />
+                <Icon size={17} strokeWidth={isActive ? 2.5 : 2} />
                 <span>{label}</span>
               </button>
             );
           })}
 
-          {/* New Plan CTA */}
-          <div className="mt-8 px-2">
+          {/* CTA: Nuevo Plan */}
+          <div className="mt-8 px-1">
             <button
               onClick={() => setActiveTab("asistente")}
-              className="w-full py-4 text-white font-bold rounded-full flex items-center justify-center gap-2 transition-all active:scale-95 hover:brightness-90"
+              className="w-full py-3.5 text-white font-bold rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95"
               style={{
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                background: "linear-gradient(135deg, #F27405 0%, #FD7C14 100%)",
-                boxShadow: "0 4px 15px rgba(242, 116, 5, 0.30)",
+                fontFamily: "var(--font-display)",
+                background: ctaGradient,
+                boxShadow: ctaShadow,
                 fontSize: "0.875rem",
+                letterSpacing: "-0.01em",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.filter = "brightness(1.08)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.filter = "none";
               }}
             >
-              <Plus size={18} strokeWidth={2.5} />
+              <Plus size={17} strokeWidth={2.5} />
               Nuevo Plan
             </button>
           </div>
         </nav>
 
-        {/* Footer: Ayuda + Cerrar Sesión */}
-        <div className="flex flex-col gap-1 pt-6" style={{ borderTop: `1px solid ${dividerColor}` }}>
-          <NavFooterBtn icon={HelpCircle} label="Ayuda" isDark={isDark} />
+        {/* Footer — no divider line: use spacing + tonal shift */}
+        <div className="flex flex-col gap-0.5 pt-6">
+          <NavFooterBtn
+            icon={HelpCircle}
+            label="Ayuda"
+            isDark={isDark}
+            activeColor={activeColor}
+            inactiveText={inactiveText}
+            hoverBg={hoverBg}
+            onClick={() => window.open("mailto:ignacio.gomez@bit-a.com?subject=Ayuda%20-%20Facilitador%20Docente", "_blank")}
+          />
           <NavFooterBtn
             icon={LogOut}
             label="Cerrar Sesión"
             isDark={isDark}
+            activeColor={activeColor}
+            inactiveText={inactiveText}
+            hoverBg={hoverBg}
             onClick={() => signOut({ redirectUrl: "/sign-in" })}
           />
         </div>
@@ -177,72 +230,61 @@ export default function AppShell() {
 
       {/* ── Top Bar ───────────────────────────────────────────────────────── */}
       <header
-        className="fixed top-0 right-0 z-40 flex justify-between items-center px-8"
+        className="fixed top-0 right-0 z-40 flex justify-between items-center px-4 md:px-8"
         style={{
-          left: "256px",
-          height: "80px",
+          left: isMobile ? "0" : "256px",
+          height: "64px",
           background: topBarBg,
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          // Tonal elevation — no hard border
+          boxShadow: isDark
+            ? "0 1px 0 rgba(255,255,255,0.04)"
+            : "0 1px 0 rgba(25,28,30,0.05)",
         }}
       >
-        {/* Search */}
-        <div className="flex-1" style={{ maxWidth: "36rem" }}>
-          {/* <div className="relative flex items-center">
-            <Search
-              size={15}
-              className="absolute"
-              style={{ left: "1rem", color: "#94a3b8", pointerEvents: "none" }}
-            />
-            <input
-              className="w-full rounded-full text-sm transition-all"
-              placeholder="Buscar planificaciones..."
-              type="text"
-              style={{
-                fontFamily: "'Inter', sans-serif",
-                background: searchBg,
-                border: "none",
-                paddingLeft: "2.75rem",
-                paddingRight: "1rem",
-                paddingTop: "0.6rem",
-                paddingBottom: "0.6rem",
-                outline: "none",
-                color: searchTextColor,
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.background = searchFocusBg;
-                e.currentTarget.style.boxShadow = "0 0 0 2px rgba(242,116,5,0.30)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.background = searchBg;
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            />
-          </div> */}
-        </div>
+        {/* Isotipo en mobile */}
+        {isMobile && (
+          <Image
+            src={isDark ? "/isotipo_dark.png" : "/isotipo.png"}
+            alt="Facilitador Docente"
+            width={32}
+            height={32}
+            style={{ objectFit: "contain" }}
+            priority
+          />
+        )}
 
-        {/* Right: theme toggle + divider + user */}
-        <div className="flex items-center gap-4">
+        {!isMobile && <div className="flex-1" />}
+
+        {/* Right: theme toggle + user */}
+        <div className="flex items-center gap-3 ml-auto">
           <ThemeToggle />
 
-          <div style={{ width: "1px", height: "2rem", background: dividerColor }} />
+          {/* Ghost border fallback: 15% opacity */}
+          <div style={{
+            width: "1px", height: "1.75rem",
+            background: isDark
+              ? "rgba(87,66,56,0.50)"
+              : "rgba(222,193,179,0.60)",
+          }} />
 
-          {/* User */}
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
               <p
-                className="text-sm font-bold"
-                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: userNameColor }}
+                className="text-sm font-semibold"
+                style={{
+                  fontFamily: "var(--font-display)",
+                  color: userNameColor,
+                  letterSpacing: "-0.01em",
+                }}
               >
                 {user?.fullName || user?.firstName || "Docente"}
               </p>
             </div>
             <UserButton appearance={{
               elements: {
-                userButtonAvatarBox: {
-                  width: "38px",
-                  height: "38px",
-                },
+                userButtonAvatarBox: { width: "34px", height: "34px" },
               },
             }} />
           </div>
@@ -251,8 +293,15 @@ export default function AppShell() {
 
       {/* ── Main Content ──────────────────────────────────────────────────── */}
       <main
-        className="overflow-y-auto"
-        style={{ marginLeft: "256px", paddingTop: "80px", minHeight: "100vh" }}
+        className={activeTab === "asistente" ? "flex flex-col" : "overflow-y-auto"}
+        style={{
+          marginLeft: isMobile ? "0" : "256px",
+          paddingTop: "64px",
+          paddingBottom: isMobile ? "72px" : "0",
+          ...(activeTab === "asistente"
+            ? { height: "100vh", overflow: "hidden" }
+            : { minHeight: "100vh" }),
+        }}
       >
         {activeTab === "dashboard"       && <DashboardTab onNavigate={(t) => setActiveTab(t as Tab)} />}
         {activeTab === "planificaciones" && <PlanificacionesTab onGoToPlanificador={() => setActiveTab("asistente")} />}
@@ -260,6 +309,54 @@ export default function AppShell() {
         {activeTab === "asistente"       && <AsistenteTab />}
         {activeTab === "programa"        && <ProgramaTab />}
       </main>
+
+      {/* ── Bottom Nav (mobile) ───────────────────────────────────────────── */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
+        style={{
+          background: sidebarBg,
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          // Tonal separation — no hard border
+          boxShadow: isDark
+            ? "0 -1px 0 rgba(255,255,255,0.05)"
+            : "0 -1px 0 rgba(25,28,30,0.06)",
+          height: "72px",
+          paddingBottom: "env(safe-area-inset-bottom)",
+        }}
+      >
+        {NAV.map(({ id, mobileLabel, Icon }) => {
+          const isActive = activeTab === id;
+          return (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-200 active:scale-90"
+              style={{ color: isActive ? activeColor : inactiveText }}
+            >
+              <div
+                className="rounded-2xl transition-all duration-200 flex items-center justify-center"
+                style={{
+                  padding: "5px 14px",
+                  background: isActive ? activeNavBg : "transparent",
+                }}
+              >
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+              </div>
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  fontFamily: "var(--font-display)",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {mobileLabel}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }
@@ -270,30 +367,38 @@ function NavFooterBtn({
   icon: Icon,
   label,
   isDark,
+  activeColor,
+  inactiveText,
+  hoverBg,
   onClick,
 }: {
   icon: React.ElementType;
   label: string;
   isDark: boolean;
+  activeColor: string;
+  inactiveText: string;
+  hoverBg: string;
   onClick?: () => void;
 }) {
-  const inactiveText = isDark ? "#94a3b8" : "#475569";
-  const hoverBg = isDark ? "rgba(242,116,5,0.10)" : "#FFF7ED";
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-full transition-all w-full text-left"
-      style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: inactiveText }}
+      className="flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-2xl transition-all w-full text-left"
+      style={{
+        fontFamily: "var(--font-display)",
+        color: inactiveText,
+        letterSpacing: "-0.01em",
+      }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLButtonElement).style.background = hoverBg;
-        (e.currentTarget as HTMLButtonElement).style.color = "#F27405";
+        (e.currentTarget as HTMLButtonElement).style.color = activeColor;
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLButtonElement).style.background = "transparent";
         (e.currentTarget as HTMLButtonElement).style.color = inactiveText;
       }}
     >
-      <Icon size={18} />
+      <Icon size={17} strokeWidth={2} />
       <span>{label}</span>
     </button>
   );

@@ -2,85 +2,50 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { useTheme } from "next-themes";
 import { Button, Card } from "@heroui/react";
 import { createAdkSession, type PdfRef } from "../../api-actions";
+import { BookOpen, HeartHandshake, Layers, Lightbulb, Sparkles } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
 
 type Role = "user" | "agent" | "error";
 
 type CurriculumMatch = {
-  espacio: string;
-  unidad: string;
-  tramo: number;
-  grado: string;
-  contenido: string;
-  ce_codigo: string;
-  ce_texto: string;
-  competencias_mcn: string[];
-  criterio_de_logro: string;
-  metodo_ensenanza: string;
-  metodo_justificacion: string;
+  espacio: string; unidad: string; tramo: number; grado: string;
+  contenido: string; ce_codigo: string; ce_texto: string;
+  competencias_mcn: string[]; criterio_de_logro: string;
+  metodo_ensenanza: string; metodo_justificacion: string;
 };
-
 type PlanificacionMomento = {
-  momento: string;
-  duracion: string;
-  meta_aprendizaje?: string;
-  actividad: string;
-  rol_docente: string;
-  recursos: string;
+  momento: string; duracion: string; meta_aprendizaje?: string;
+  actividad: string; rol_docente: string; recursos: string;
 };
-
 type SecuenciaActividad = {
-  numero: number;
-  recorte: string;
-  meta_aprendizaje: string;
-  plan_aprendizaje: string[];
-  recursos?: string;
+  numero: number; recorte: string; meta_aprendizaje: string;
+  plan_aprendizaje: string[]; recursos?: string;
 };
-
 type SecuenciaData = {
-  espacio: string;
-  unidad_curricular: string;
-  competencias_generales: string[];
-  competencias_especificas: string[];
-  criterios_de_logro: string[];
-  meta_aprendizaje: string;
-  contenido: string;
-  evaluaciones?: string;
-  actividades: SecuenciaActividad[];
+  espacio: string; unidad_curricular: string;
+  competencias_generales: string[]; competencias_especificas: string[];
+  criterios_de_logro: string[]; meta_aprendizaje: string;
+  contenido: string; evaluaciones?: string; actividades: SecuenciaActividad[];
 };
-
 type PlanificacionData = {
-  titulo: string;
-  grupo: string;
-  justificacion: string;
-  metodologia: string;
-  metodologia_descripcion: string;
-  momentos: PlanificacionMomento[];
-  ce_codigo: string;
-  ce_texto: string;
-  contenido: string;
-  criterio_de_logro: string;
-  espacio: string;
-  unidad: string;
-  tramo: number;
-  competencias_mcn: string[];
+  titulo: string; grupo: string; justificacion: string;
+  metodologia: string; metodologia_descripcion: string;
+  momentos: PlanificacionMomento[]; ce_codigo: string; ce_texto: string;
+  contenido: string; criterio_de_logro: string; espacio: string;
+  unidad: string; tramo: number; competencias_mcn: string[];
 };
-
 type Message = {
-  id: string;
-  role: Role;
-  text: string;
-  refs: PdfRef[];
+  id: string; role: Role; text: string; refs: PdfRef[];
   curriculum_match?: CurriculumMatch;
   planificacion?: PlanificacionData;
   secuencia?: SecuenciaData;
 };
 
 // ── Token parsers ─────────────────────────────────────────────────────────────
-// Regex instances created per-call to avoid shared lastIndex state with /g flag
 function parseOptions(text: string): string[] {
   return [...text.matchAll(/\[\[(?!REF:)([^\]]+)\]\]/g)].map((m) => m[1]);
 }
@@ -100,10 +65,8 @@ function stripTokens(text: string): string {
 
 const SESSION_ID = `web-${Math.random().toString(36).slice(2, 10)}`;
 
-// Parser inline — evita importar server action en client component
 function parseAgentResponse(data: unknown): {
-  text: string;
-  refs: PdfRef[];
+  text: string; refs: PdfRef[];
   curriculum_match?: CurriculumMatch;
   planificacion?: PlanificacionData;
   secuencia?: SecuenciaData;
@@ -124,8 +87,7 @@ function parseAgentResponse(data: unknown): {
           )
         : [];
       return {
-        text: parsed.text,
-        refs,
+        text: parsed.text, refs,
         curriculum_match: parsed.curriculum_match ?? undefined,
         planificacion: parsed.planificacion ?? undefined,
         secuencia: parsed.secuencia ?? undefined,
@@ -135,34 +97,63 @@ function parseAgentResponse(data: unknown): {
   return { text: raw, refs: [] };
 }
 
+// ── Sugerencias reales de las maestras ────────────────────────────────────────
 const QUICK_PROMPTS = [
-  { label: "Planificar una clase",        emoji: "📝" },
-  { label: "Validar una actividad",       emoji: "✅" },
-  { label: "Explorar el programa EBI",    emoji: "📚" },
-  { label: "Sugerir criterios de logro",  emoji: "🎯" },
+  {
+    label: "Quiero planificar una clase para esta semana",
+    subtext: "Te genero una planificación lista para usar",
+    icon: <Sparkles size={18} color="white" />,
+    featured: true,
+  },
+  {
+    label: "Planificación para estudiantes con dificultades especiales",
+    subtext: "Adaptaciones e inclusión",
+    icon: <HeartHandshake size={18} />,
+    featured: false,
+  },
+  {
+    label: "Planificación diversificada para multigrado",
+    subtext: "Varios grados, una sola clase",
+    icon: <Layers size={18} />,
+    featured: false,
+  },
+  {
+    label: "Ideas creativas para el contexto de mis alumnos",
+    subtext: "Actividades reales y aplicables",
+    icon: <Lightbulb size={18} />,
+    featured: false,
+  },
+  {
+    label: "Explorar el programa EBI",
+    subtext: "Contenidos, competencias y criterios",
+    icon: <BookOpen size={18} />,
+    featured: false,
+  },
 ];
 
-// Minimal markdown renderer (bold, italic, code, headings, bullets)
+// ── Minimal markdown renderer ─────────────────────────────────────────────────
 function renderMarkdown(text: string): React.ReactNode[] {
   return text.split("\n").map((line, i) => {
-    if (/^###\s/.test(line)) return <h4 key={i} className="font-bold text-sm mt-3 mb-1">{line.slice(4)}</h4>;
-    if (/^##\s/.test(line))  return <h3 key={i} className="font-bold text-base mt-3 mb-1">{line.slice(3)}</h3>;
-    if (/^#\s/.test(line))   return <h2 key={i} className="font-bold text-lg mt-3 mb-1">{line.slice(2)}</h2>;
-    if (/^[-*]\s/.test(line)) return <li key={i} className="ml-4 list-disc text-sm leading-relaxed">{inline(line.slice(2))}</li>;
-    if (/^\d+\.\s/.test(line)) return <li key={i} className="ml-4 list-decimal text-sm leading-relaxed">{inline(line.replace(/^\d+\.\s/, ""))}</li>;
+    if (/^###\s/.test(line)) return <h4 key={i} className="font-bold text-sm mt-3 mb-1" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.01em" }}>{line.slice(4)}</h4>;
+    if (/^##\s/.test(line))  return <h3 key={i} className="font-bold text-base mt-3 mb-1" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>{line.slice(3)}</h3>;
+    if (/^#\s/.test(line))   return <h2 key={i} className="font-bold text-lg mt-3 mb-1" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>{line.slice(2)}</h2>;
+    if (/^[-*]\s/.test(line)) return <li key={i} className="ml-4 list-disc text-sm leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{inline(line.slice(2))}</li>;
+    if (/^\d+\.\s/.test(line)) return <li key={i} className="ml-4 list-decimal text-sm leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{inline(line.replace(/^\d+\.\s/, ""))}</li>;
     if (line.trim() === "") return <br key={i} />;
-    return <p key={i} className="text-sm leading-relaxed">{inline(line)}</p>;
+    return <p key={i} className="text-sm leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{inline(line)}</p>;
   });
 }
 
 function inline(text: string): React.ReactNode {
   return text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g).map((p, i) => {
-    if (p.startsWith("**") && p.endsWith("**")) return <strong key={i}>{p.slice(2, -2)}</strong>;
-    if (p.startsWith("`")  && p.endsWith("`"))  return <code key={i} className="bg-black/10 rounded px-1 font-mono text-xs">{p.slice(1, -1)}</code>;
+    if (p.startsWith("**") && p.endsWith("**")) return <strong key={i} style={{ fontFamily: "var(--font-display)" }}>{p.slice(2, -2)}</strong>;
+    if (p.startsWith("`")  && p.endsWith("`"))  return <code key={i} className="rounded px-1 font-mono text-xs" style={{ background: "rgba(0,0,0,0.08)" }}>{p.slice(1, -1)}</code>;
     if (p.startsWith("*")  && p.endsWith("*"))  return <em key={i}>{p.slice(1, -1)}</em>;
     return p;
   });
 }
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function AsistenteTab() {
   const [messages, setMessages]       = useState<Message[]>([]);
@@ -173,6 +164,21 @@ export default function AsistenteTab() {
   const bottomRef                     = useRef<HTMLDivElement>(null);
   const textareaRef                   = useRef<HTMLTextAreaElement>(null);
   const { getToken }                  = useAuth();
+  const { resolvedTheme }             = useTheme();
+  const [mounted, setMounted]         = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const isDark = mounted && resolvedTheme === "dark";
+
+  // ── Tokens ──────────────────────────────────────────────────────────────────
+  const primaryColor  = isDark ? "oklch(0.72 0.16 38)" : "#F27405";
+  const surfaceLow    = isDark ? "#191c1e" : "#f3f3f7";
+  const surfaceLowest = isDark ? "#0b0d0f" : "#ffffff";
+  const onSurface     = isDark ? "#e2e0dd" : "#191c1e";
+  const onVariant     = isDark ? "#d3bcaf" : "#6b7280";
+  const shadowCard    = isDark
+    ? "0 12px 32px -4px rgba(0,0,0,0.28)"
+    : "0 12px 32px -4px rgba(25,28,30,0.06)";
 
   useEffect(() => {
     createAdkSession(SESSION_ID).then(() => setReady(true));
@@ -186,6 +192,7 @@ export default function AsistenteTab() {
     const t = text.trim();
     if (!t || loading || !sessionReady) return;
     setInput("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", text: t, refs: [] }]);
     setLoading(true);
     setStatusLabel("Pensando…");
@@ -221,22 +228,15 @@ export default function AsistenteTab() {
           } else if (evt.type === "done") {
             const reply = parseAgentResponse({ session_id: evt.session_id, response: evt.response });
             setMessages((prev) => [...prev, {
-              id: crypto.randomUUID(),
-              role: "agent",
-              text: reply.text,
-              refs: reply.refs,
+              id: crypto.randomUUID(), role: "agent",
+              text: reply.text, refs: reply.refs,
               curriculum_match: reply.curriculum_match,
               planificacion: reply.planificacion,
               secuencia: reply.secuencia,
             }]);
             setLoading(false);
           } else if (evt.type === "error") {
-            setMessages((prev) => [...prev, {
-              id: crypto.randomUUID(),
-              role: "error",
-              text: "Error al contactar el agente.",
-              refs: [],
-            }]);
+            setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "error", text: "Error al contactar el agente.", refs: [] }]);
             setLoading(false);
           }
         }
@@ -256,89 +256,293 @@ export default function AsistenteTab() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
   };
 
+  const autoResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`;
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0">
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-[var(--surface)] flex-shrink-0">
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      <div
+        className="flex items-center justify-between px-6 py-4 flex-shrink-0"
+        style={{
+          background: isDark ? "rgba(16,18,19,0.80)" : "rgba(255,255,255,0.80)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          boxShadow: isDark
+            ? "0 1px 0 rgba(255,255,255,0.04)"
+            : "0 1px 0 rgba(25,28,30,0.06)",
+        }}
+      >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-danger/10 flex items-center justify-center text-danger">
-            <ChatIcon />
+          {/* Sparkle icon con el naranja nuevo */}
+          <div
+            className="w-9 h-9 rounded-2xl flex items-center justify-center"
+            style={{ background: isDark ? "rgba(200,100,50,0.16)" : "rgba(242,116,5,0.10)", color: primaryColor }}
+          >
+            <SparkleIcon />
           </div>
           <div>
-            <p className="text-sm font-bold text-foreground">Facilitador Docente EBI</p>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <span className={`w-1.5 h-1.5 rounded-full inline-block ${sessionReady ? "bg-success" : "bg-warning"}`} />
-              {sessionReady ? "Agente listo" : "Conectando…"}
+            <p
+              className="text-sm font-bold"
+              style={{ fontFamily: "var(--font-display)", color: onSurface, letterSpacing: "-0.01em" }}
+            >
+              Planificador IA
+            </p>
+            <p className="text-xs flex items-center gap-1.5" style={{ color: onVariant, fontFamily: "var(--font-body)" }}>
+              <span
+                className="w-1.5 h-1.5 rounded-full inline-block"
+                style={{ background: sessionReady ? "#16a34a" : "#d97706" }}
+              />
+              {sessionReady ? "Listo para ayudarte" : "Conectando…"}
             </p>
           </div>
         </div>
-        <Button variant="ghost" isIconOnly size="sm" onPress={reset} aria-label="Nueva sesión">
+        <button
+          onClick={reset}
+          aria-label="Nueva sesión"
+          className="rounded-xl transition-all active:scale-95"
+          style={{
+            padding: "0.5rem",
+            color: onVariant,
+            background: "transparent",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = isDark ? "rgba(255,255,255,0.06)" : "rgba(25,28,30,0.05)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
+        >
           <ResetIcon />
-        </Button>
+        </button>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 min-h-0">
+      {/* ── Messages ────────────────────────────────────────────────────── */}
+      <div
+        className="flex-1 overflow-y-auto min-h-0"
+        style={{ padding: "1.5rem 1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}
+      >
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full gap-6 py-12">
-            <div className="w-16 h-16 rounded-2xl bg-danger/10 flex items-center justify-center text-danger">
-              <ChatIcon size={32} />
-            </div>
-            <div className="text-center">
-              <p className="font-semibold text-foreground">Asistente Docente EBI</p>
-              <p className="text-sm text-muted-foreground mt-1 max-w-xs">
-                Preguntame sobre planificación, actividades, criterios de logro o el programa EBI.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 w-full max-w-sm">
-              {QUICK_PROMPTS.map((q) => (
-                <button
-                  key={q.label}
-                  onClick={() => send(q.label)}
-                  disabled={!sessionReady}
-                  className="flex items-center gap-2 px-3 py-2.5 border border-border rounded-xl text-sm text-foreground hover:bg-muted disabled:opacity-50 transition-all text-left"
-                >
-                  <span>{q.emoji}</span>
-                  <span className="text-xs font-medium">{q.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <WelcomeScreen
+            sessionReady={sessionReady}
+            onSend={send}
+            isDark={isDark}
+            primaryColor={primaryColor}
+            surfaceLowest={surfaceLowest}
+            onSurface={onSurface}
+            onVariant={onVariant}
+            shadowCard={shadowCard}
+          />
         )}
 
-        {messages.map((msg) => <Bubble key={msg.id} message={msg} onOptionClick={send} />)}
-        {loading && <TypingIndicator label={statusLabel} />}
+        {messages.map((msg) => (
+          <Bubble
+            key={msg.id}
+            message={msg}
+            onOptionClick={send}
+            isDark={isDark}
+            primaryColor={primaryColor}
+            surfaceLow={surfaceLow}
+            onSurface={onSurface}
+            onVariant={onVariant}
+            shadowCard={shadowCard}
+          />
+        ))}
+        {loading && <TypingIndicator label={statusLabel} isDark={isDark} surfaceLow={surfaceLow} onVariant={onVariant} />}
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="px-4 pb-4 pt-3 border-t border-border bg-[var(--surface)] flex-shrink-0">
-        <div className="flex items-end gap-2">
+      {/* ── Input ───────────────────────────────────────────────────────── */}
+      <div
+        className="flex-shrink-0 px-4 pb-4 pt-3"
+        style={{
+          background: isDark ? "rgba(16,18,19,0.80)" : "rgba(255,255,255,0.80)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          boxShadow: isDark
+            ? "0 -1px 0 rgba(255,255,255,0.04)"
+            : "0 -1px 0 rgba(25,28,30,0.06)",
+        }}
+      >
+        <div
+          className="flex items-end gap-2 rounded-2xl p-1.5"
+          style={{
+            background: surfaceLowest,
+            boxShadow: shadowCard,
+          }}
+        >
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={autoResize}
             onKeyDown={onKey}
             disabled={loading || !sessionReady}
             rows={1}
-            placeholder={sessionReady ? "Escribí tu consulta… (Enter para enviar)" : "Conectando con el agente…"}
-            className="flex-1 border border-border rounded-xl px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-accent/40 bg-background text-foreground disabled:opacity-60"
-            style={{ maxHeight: "120px", overflowY: "auto" }}
+            placeholder={sessionReady ? "Escribí tu consulta…" : "Conectando con el agente…"}
+            className="flex-1 resize-none focus:outline-none disabled:opacity-60"
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: "0.625rem 0.75rem",
+              fontSize: "0.875rem",
+              lineHeight: "1.5",
+              color: onSurface,
+              fontFamily: "var(--font-body)",
+              maxHeight: "140px",
+              overflowY: "auto",
+            }}
           />
-          <Button
-            variant="primary"
-            isIconOnly
-            isDisabled={loading || !sessionReady || !input.trim()}
-            onPress={() => send(input)}
+          <button
+            onClick={() => send(input)}
+            disabled={loading || !sessionReady || !input.trim()}
             aria-label="Enviar"
+            className="rounded-xl transition-all active:scale-90 disabled:opacity-40 flex-shrink-0"
+            style={{
+              background: input.trim() ? primaryColor : (isDark ? "rgba(255,255,255,0.08)" : "rgba(25,28,30,0.06)"),
+              color: input.trim() ? "#ffffff" : onVariant,
+              padding: "0.625rem",
+              border: "none",
+              cursor: input.trim() ? "pointer" : "not-allowed",
+              transition: "all 0.18s ease",
+              marginBottom: "0.125rem",
+            }}
           >
             <SendIcon />
-          </Button>
+          </button>
         </div>
-        <p className="text-xs text-muted-foreground mt-1.5 ml-1">
-          Shift+Enter para nueva línea · El agente tiene acceso al programa EBI
+        <p
+          className="hidden md:block text-xs mt-2 ml-1"
+          style={{ color: onVariant, opacity: 0.6, fontFamily: "var(--font-body)" }}
+        >
+          Shift+Enter para nueva línea · Agente con acceso al programa EBI
         </p>
+      </div>
+    </div>
+  );
+}
+
+// ── Welcome screen ────────────────────────────────────────────────────────────
+
+function WelcomeScreen({
+  sessionReady, onSend, isDark, primaryColor, surfaceLowest,
+  onSurface, onVariant, shadowCard,
+}: {
+  sessionReady: boolean; onSend: (t: string) => void;
+  isDark: boolean; primaryColor: string; surfaceLowest: string;
+  onSurface: string; onVariant: string; shadowCard: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center flex-1 gap-8 py-8 px-2">
+
+      {/* Icon + heading */}
+      <div className="flex flex-col items-center gap-4 text-center">
+        <div
+          className="w-16 h-16 rounded-3xl flex items-center justify-center"
+          style={{
+            background: isDark ? "rgba(200,100,50,0.16)" : "rgba(242,116,5,0.10)",
+            color: primaryColor,
+            boxShadow: shadowCard,
+          }}
+        >
+          <SparkleIcon size={32} />
+        </div>
+        <div>
+          <h2
+            className="text-xl font-black"
+            style={{ fontFamily: "var(--font-display)", color: onSurface, letterSpacing: "-0.02em" }}
+          >
+            ¿En qué te ayudo hoy?
+          </h2>
+          <p
+            className="text-sm mt-1 max-w-sm"
+            style={{ fontFamily: "var(--font-body)", color: onVariant, lineHeight: 1.6 }}
+          >
+            Estoy acá para que pases menos horas planificando y más tiempo con tus alumnos.
+          </p>
+        </div>
+      </div>
+
+      {/* Suggestion chips */}
+      <div className="w-full max-w-xl flex flex-col gap-2.5">
+        {/* Featured CTA */}
+        <button
+          onClick={() => onSend(QUICK_PROMPTS[0].label)}
+          disabled={!sessionReady}
+          className="w-full text-left rounded-2xl transition-all active:scale-[0.99] disabled:opacity-50"
+          style={{
+            background: primaryColor,
+            padding: "1rem 1.25rem",
+            border: "none",
+            cursor: "pointer",
+            boxShadow: isDark
+              ? "0 8px 24px rgba(200,100,50,0.28)"
+              : "0 8px 24px rgba(242,116,5,0.22)",
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = "brightness(1.08)"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = "none"; }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex-shrink-0 opacity-90">{QUICK_PROMPTS[0].icon}</span>
+            <div>
+              <p
+                className="text-sm font-bold text-white"
+                style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.01em" }}
+              >
+                {QUICK_PROMPTS[0].label}
+              </p>
+              <p className="text-xs text-white/70 mt-0.5" style={{ fontFamily: "var(--font-body)" }}>
+                {QUICK_PROMPTS[0].subtext}
+              </p>
+            </div>
+          </div>
+        </button>
+
+        {/* Regular chips — 2 columns */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {QUICK_PROMPTS.slice(1).map((q) => (
+            <button
+              key={q.label}
+              onClick={() => onSend(q.label)}
+              disabled={!sessionReady}
+              className="text-left rounded-2xl transition-all active:scale-[0.99] disabled:opacity-50"
+              style={{
+                background: surfaceLowest,
+                padding: "0.875rem 1rem",
+                border: "none",
+                cursor: "pointer",
+                boxShadow: shadowCard,
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = isDark
+                  ? "0 12px 32px -4px rgba(0,0,0,0.40)"
+                  : "0 12px 32px -4px rgba(25,28,30,0.12)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = shadowCard;
+              }}
+            >
+              <div className="flex items-start gap-2.5">
+                <div style={{ color: onVariant, flexShrink: 0, marginTop: "1px" }}>{q.icon}</div>
+                <div>
+                  <p
+                    className="text-xs font-semibold leading-snug"
+                    style={{ fontFamily: "var(--font-display)", color: onSurface, letterSpacing: "-0.01em" }}
+                  >
+                    {q.label}
+                  </p>
+                  <p
+                    className="text-xs mt-0.5"
+                    style={{ fontFamily: "var(--font-body)", color: onVariant, opacity: 0.8 }}
+                  >
+                    {q.subtext}
+                  </p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -346,7 +550,13 @@ export default function AsistenteTab() {
 
 // ── Bubble ────────────────────────────────────────────────────────────────────
 
-function Bubble({ message, onOptionClick }: { message: Message; onOptionClick: (t: string) => void }) {
+function Bubble({
+  message, onOptionClick, isDark, primaryColor, surfaceLow, onSurface, onVariant, shadowCard,
+}: {
+  message: Message; onOptionClick: (t: string) => void;
+  isDark: boolean; primaryColor: string; surfaceLow: string;
+  onSurface: string; onVariant: string; shadowCard: string;
+}) {
   const isUser  = message.role === "user";
   const isError = message.role === "error";
   const [copied, setCopied] = useState(false);
@@ -363,43 +573,68 @@ function Bubble({ message, onOptionClick }: { message: Message; onOptionClick: (
 
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[85%] flex flex-col gap-1.5 ${isUser ? "items-end" : "items-start"}`}>
-        {/* Curriculum match card */}
-        {!isUser && message.curriculum_match && (
-          <CurriculumMatchCard data={message.curriculum_match} />
-        )}
+      <div className={`max-w-[85%] flex flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}>
 
-        {/* Planificacion table */}
+        {!isUser && message.curriculum_match && (
+          <CurriculumMatchCard data={message.curriculum_match} isDark={isDark} onSurface={onSurface} onVariant={onVariant} primaryColor={primaryColor} />
+        )}
         {!isUser && message.planificacion && (
           <PlanificacionTabla data={message.planificacion} />
         )}
-
-        {/* Secuencia de actividades */}
         {!isUser && message.secuencia && (
           <SecuenciaTablaInline data={message.secuencia} />
         )}
 
-        {/* Bubble body — always shown, contains conversational text */}
+        {/* Bubble body */}
         {isUser ? (
-          <div className="px-4 py-3 rounded-2xl rounded-br-sm bg-accent text-accent-foreground text-sm leading-relaxed">
+          <div
+            className="rounded-2xl rounded-br-sm"
+            style={{
+              background: primaryColor,
+              color: "#ffffff",
+              padding: "0.75rem 1rem",
+              fontSize: "0.875rem",
+              lineHeight: 1.6,
+              fontFamily: "var(--font-body)",
+            }}
+          >
             {message.text}
           </div>
         ) : (
-          <Card
-            variant={isError ? "transparent" : "secondary"}
-            className={`px-4 py-3 rounded-2xl rounded-bl-sm ${isError ? "border border-danger/30 text-danger" : ""}`}
+          <div
+            className={`rounded-2xl rounded-bl-sm ${isError ? "border border-red-400/30" : ""}`}
+            style={{
+              background: isError
+                ? (isDark ? "rgba(220,38,38,0.08)" : "rgba(220,38,38,0.05)")
+                : surfaceLow,
+              padding: "0.875rem 1rem",
+              boxShadow: isError ? "none" : shadowCard,
+              color: isError ? "#dc2626" : onSurface,
+            }}
           >
             <div className="space-y-1">{renderMarkdown(bodyText)}</div>
-          </Card>
+          </div>
         )}
 
-        {/* Copy button */}
+        {/* Copy */}
         {!isUser && (
           <button
             onClick={copy}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
+            className="flex items-center gap-1 transition-opacity hover:opacity-100"
+            style={{
+              fontSize: "0.7rem",
+              color: onVariant,
+              opacity: 0.6,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "var(--font-body)",
+              padding: "0 0.25rem",
+            }}
           >
-            {copied ? <><span className="text-success">✓</span> Copiado</> : <><CopyIcon /> Copiar</>}
+            {copied
+              ? <><span style={{ color: "#16a34a" }}>✓</span> Copiado</>
+              : <><CopyIcon /> Copiar</>}
           </button>
         )}
 
@@ -410,7 +645,20 @@ function Bubble({ message, onOptionClick }: { message: Message; onOptionClick: (
               <button
                 key={opt}
                 onClick={() => onOptionClick(opt)}
-                className="px-3 py-1.5 rounded-xl border border-border text-xs font-medium text-foreground hover:bg-muted hover:border-accent transition-all"
+                className="rounded-xl transition-all active:scale-95"
+                style={{
+                  padding: "0.375rem 0.875rem",
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  fontFamily: "var(--font-display)",
+                  color: onSurface,
+                  background: surfaceLow,
+                  border: "none",
+                  cursor: "pointer",
+                  boxShadow: shadowCard,
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = primaryColor; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = onSurface; }}
               >
                 {opt}
               </button>
@@ -420,19 +668,36 @@ function Bubble({ message, onOptionClick }: { message: Message; onOptionClick: (
 
         {/* Multi-select options */}
         {multiOptions.length > 0 && (
-          <MultiSelect options={multiOptions} onConfirm={onOptionClick} />
+          <MultiSelect
+            options={multiOptions}
+            onConfirm={onOptionClick}
+            isDark={isDark}
+            primaryColor={primaryColor}
+            surfaceLow={surfaceLow}
+            onSurface={onSurface}
+            shadowCard={shadowCard}
+          />
         )}
 
-        {/* PDF reference badges */}
+        {/* PDF refs */}
         {message.refs.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
+          <div className="flex flex-wrap gap-2 mt-1">
             {message.refs.map((ref, i) => (
               <a
                 key={i}
                 href={`${API_BASE}/pdfs/${encodeURIComponent(ref.filename)}#page=${ref.page}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 text-xs font-medium hover:bg-blue-100 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-xl transition-opacity hover:opacity-80"
+                style={{
+                  padding: "0.25rem 0.75rem",
+                  background: isDark ? "rgba(18,74,240,0.16)" : "rgba(18,74,240,0.08)",
+                  color: isDark ? "#bdceff" : "#124af0",
+                  fontSize: "0.72rem",
+                  fontWeight: 600,
+                  fontFamily: "var(--font-body)",
+                  textDecoration: "none",
+                }}
               >
                 <PdfIcon />
                 {ref.label || `${ref.filename} p.${ref.page}`}
@@ -447,51 +712,73 @@ function Bubble({ message, onOptionClick }: { message: Message; onOptionClick: (
 
 // ── CurriculumMatchCard ───────────────────────────────────────────────────────
 
-function CurriculumMatchCard({ data }: { data: CurriculumMatch }) {
+function CurriculumMatchCard({
+  data, isDark, onSurface, onVariant, primaryColor,
+}: {
+  data: CurriculumMatch; isDark: boolean;
+  onSurface: string; onVariant: string; primaryColor: string;
+}) {
+  const surfaceLow = isDark ? "#191c1e" : "#f3f3f7";
+  const shadow = isDark
+    ? "0 12px 32px -4px rgba(0,0,0,0.28)"
+    : "0 12px 32px -4px rgba(25,28,30,0.06)";
+
   return (
-    <Card variant="secondary" className="p-4 rounded-2xl space-y-3 w-full">
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contenido curricular</span>
-        <div className="flex-1 h-px bg-border" />
+    <div
+      className="rounded-2xl p-4 w-full"
+      style={{ background: surfaceLow, boxShadow: shadow }}
+    >
+      <p
+        className="text-xs font-bold uppercase tracking-widest mb-3"
+        style={{ color: primaryColor, fontFamily: "var(--font-display)" }}
+      >
+        Contenido curricular
+      </p>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 mb-3">
+        <MatchField label="Espacio" value={data.espacio} onSurface={onSurface} onVariant={onVariant} />
+        <MatchField label="Unidad" value={data.unidad} onSurface={onSurface} onVariant={onVariant} />
+        <MatchField label="Tramo" value={`Tramo ${data.tramo}`} onSurface={onSurface} onVariant={onVariant} />
+        <MatchField label="Grado" value={`${data.grado} grado`} onSurface={onSurface} onVariant={onVariant} />
       </div>
-
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
-        <MatchField label="Espacio" value={data.espacio} />
-        <MatchField label="Unidad" value={data.unidad} />
-        <MatchField label="Tramo" value={`Tramo ${data.tramo}`} />
-        <MatchField label="Grado" value={`${data.grado} grado`} />
-      </div>
-
-      <div className="space-y-2.5 pt-1 border-t border-border">
-        <MatchField label="Contenido" value={data.contenido} />
+      <div className="space-y-2.5 pt-3" style={{ borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(25,28,30,0.06)"}` }}>
+        <MatchField label="Contenido" value={data.contenido} onSurface={onSurface} onVariant={onVariant} />
         <div>
-          <p className="text-xs text-muted-foreground font-medium mb-0.5">{data.ce_codigo}</p>
-          <p className="text-sm text-foreground font-medium leading-relaxed">{data.ce_texto}</p>
+          <p className="text-xs font-medium mb-0.5" style={{ color: onVariant, fontFamily: "var(--font-body)" }}>{data.ce_codigo}</p>
+          <p className="text-sm font-medium leading-relaxed" style={{ color: onSurface, fontFamily: "var(--font-body)" }}>{data.ce_texto}</p>
         </div>
-        <MatchField label="Criterio de logro" value={data.criterio_de_logro} />
+        <MatchField label="Criterio de logro" value={data.criterio_de_logro} onSurface={onSurface} onVariant={onVariant} />
       </div>
-
       {data.competencias_mcn.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 mt-3">
           {data.competencias_mcn.map((c, i) => (
-            <span key={i} className="px-2 py-0.5 bg-accent/10 text-accent text-xs rounded-full font-medium">{c}</span>
+            <span
+              key={i}
+              className="rounded-full text-xs font-semibold"
+              style={{
+                padding: "0.2rem 0.6rem",
+                background: isDark ? "rgba(200,100,50,0.16)" : "rgba(242,116,5,0.10)",
+                color: primaryColor,
+                fontFamily: "var(--font-display)",
+              }}
+            >
+              {c}
+            </span>
           ))}
         </div>
       )}
-
-      <div className="pt-2 border-t border-border">
-        <p className="text-xs font-semibold text-foreground">{data.metodo_ensenanza}</p>
-        <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{data.metodo_justificacion}</p>
+      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(25,28,30,0.06)"}` }}>
+        <p className="text-xs font-semibold" style={{ color: onSurface, fontFamily: "var(--font-display)" }}>{data.metodo_ensenanza}</p>
+        <p className="text-xs mt-0.5 leading-relaxed" style={{ color: onVariant, fontFamily: "var(--font-body)" }}>{data.metodo_justificacion}</p>
       </div>
-    </Card>
+    </div>
   );
 }
 
-function MatchField({ label, value }: { label: string; value: string }) {
+function MatchField({ label, value, onSurface, onVariant }: { label: string; value: string; onSurface: string; onVariant: string }) {
   return (
     <div>
-      <p className="text-xs text-muted-foreground font-medium">{label}</p>
-      <p className="text-sm text-foreground leading-relaxed">{value}</p>
+      <p className="text-xs font-medium" style={{ color: onVariant, fontFamily: "var(--font-body)" }}>{label}</p>
+      <p className="text-sm leading-relaxed" style={{ color: onSurface, fontFamily: "var(--font-body)" }}>{value}</p>
     </div>
   );
 }
@@ -505,74 +792,50 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
     const blob = await pdf(<PlanificacionPDF data={data} nombre={data.titulo} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `${data.titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`;
-    a.click();
+    a.href = url; a.download = `${data.titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`; a.click();
     URL.revokeObjectURL(url);
   };
-
   const exportCSV = () => {
     const bom = "\uFEFF";
     const headers = ["Momento", "Duración", "Actividad", "Rol docente", "Recursos"];
     const rows = data.momentos.map((m) => [m.momento, m.duracion, m.actividad, m.rol_docente, m.recursos]);
-    const csv = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `${data.titulo.replace(/\s+/g, "_").slice(0, 60)}.csv`;
-    a.click();
+    a.href = url; a.download = `${data.titulo.replace(/\s+/g, "_").slice(0, 60)}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
-
   const momentoColor: Record<string, string> = {
-    Inicio:    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-    Desarrollo:"bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-    Cierre:    "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+    Inicio:     "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+    Desarrollo: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+    Cierre:     "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
   };
-
   return (
     <Card variant="secondary" className="p-4 rounded-2xl space-y-4 w-full">
-      {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-bold text-sm text-foreground leading-snug">{data.titulo}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{data.grupo}</p>
+          <p className="font-bold text-sm text-foreground leading-snug" style={{ fontFamily: "var(--font-display)" }}>{data.titulo}</p>
+          <p className="text-xs text-muted-foreground mt-0.5" style={{ fontFamily: "var(--font-body)" }}>{data.grupo}</p>
         </div>
         <div className="flex gap-2 shrink-0">
-          <button
-            onClick={exportCSV}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-          >
-            <ExportIcon /> Excel
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-          >
-            <PdfIcon /> PDF
-          </button>
+          <ExportBtn onClick={exportCSV} label="Excel" icon={<ExportIcon />} />
+          <ExportBtn onClick={handleExportPDF} label="PDF" icon={<PdfIcon />} />
         </div>
       </div>
-
-      {/* Justificación */}
-      <p className="text-xs text-foreground/80 leading-relaxed">{data.justificacion}</p>
-
-      {/* Metodología */}
-      <div className="px-3 py-2.5 bg-accent/10 rounded-xl">
-        <p className="text-xs font-semibold text-accent">{data.metodologia}</p>
-        <p className="text-xs text-foreground/70 mt-0.5 leading-relaxed">{data.metodologia_descripcion}</p>
-      </div>
-
-      {/* Tabla */}
+      {data.justificacion && <p className="text-xs text-foreground/80 leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{data.justificacion}</p>}
+      {data.metodologia && (
+        <div className="px-3 py-2.5 rounded-xl" style={{ background: "rgba(242,116,5,0.08)" }}>
+          <p className="text-xs font-semibold text-accent" style={{ fontFamily: "var(--font-display)" }}>{data.metodologia}</p>
+          {data.metodologia_descripcion && <p className="text-xs text-foreground/70 mt-0.5 leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{data.metodologia_descripcion}</p>}
+        </div>
+      )}
       <div className="overflow-x-auto -mx-1">
         <table className="w-full text-xs border-collapse min-w-[480px]">
           <thead>
             <tr className="border-b border-border">
               {["Momento", "Duración", "Meta de aprendizaje", "Actividad", "Rol docente", "Recursos"].map((h) => (
-                <th key={h} className="text-left py-2 pr-3 first:pl-1 font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
+                <th key={h} className="text-left py-2 pr-3 first:pl-1 font-semibold text-muted-foreground whitespace-nowrap" style={{ fontFamily: "var(--font-display)" }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -580,27 +843,23 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
             {data.momentos.map((m, i) => (
               <tr key={i} className="border-b border-border/40 align-top">
                 <td className="py-3 pr-3 pl-1 whitespace-nowrap">
-                  <span className={`px-2 py-0.5 rounded-full font-medium text-xs ${momentoColor[m.momento] ?? "bg-muted text-foreground"}`}>
-                    {m.momento}
-                  </span>
+                  <span className={`px-2 py-0.5 rounded-full font-medium text-xs ${momentoColor[m.momento] ?? "bg-muted text-foreground"}`} style={{ fontFamily: "var(--font-display)" }}>{m.momento}</span>
                 </td>
-                <td className="py-3 pr-3 text-muted-foreground whitespace-nowrap">{m.duracion}</td>
-                <td className="py-3 pr-3 leading-relaxed font-medium text-foreground/90">{m.meta_aprendizaje ?? <span className="text-muted-foreground/40 italic">—</span>}</td>
-                <td className="py-3 pr-3 leading-relaxed">{m.actividad}</td>
-                <td className="py-3 pr-3 leading-relaxed text-muted-foreground">{m.rol_docente}</td>
-                <td className="py-3 leading-relaxed text-muted-foreground">{m.recursos}</td>
+                <td className="py-3 pr-3 text-muted-foreground whitespace-nowrap" style={{ fontFamily: "var(--font-body)" }}>{m.duracion}</td>
+                <td className="py-3 pr-3 leading-relaxed font-medium text-foreground/90" style={{ fontFamily: "var(--font-body)" }}>{m.meta_aprendizaje ?? <span className="text-muted-foreground/40 italic">—</span>}</td>
+                <td className="py-3 pr-3 leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{m.actividad}</td>
+                <td className="py-3 pr-3 leading-relaxed text-muted-foreground" style={{ fontFamily: "var(--font-body)" }}>{m.rol_docente}</td>
+                <td className="py-3 leading-relaxed text-muted-foreground" style={{ fontFamily: "var(--font-body)" }}>{m.recursos}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-
-      {/* Referencias normativas */}
-      <div className="pt-2 border-t border-border space-y-1 text-xs text-muted-foreground">
-        <p><strong className="text-foreground">{data.ce_codigo}</strong> — {data.ce_texto}</p>
-        <p><strong className="text-foreground">Contenido:</strong> {data.contenido}</p>
-        <p><strong className="text-foreground">Criterio de logro:</strong> {data.criterio_de_logro}</p>
-        <p className="text-foreground/50">{data.espacio} · {data.unidad} · Tramo {data.tramo}</p>
+      <div className="pt-2 space-y-1 text-xs text-muted-foreground" style={{ borderTop: "1px solid rgba(25,28,30,0.06)" }}>
+        <p style={{ fontFamily: "var(--font-body)" }}><strong className="text-foreground" style={{ fontFamily: "var(--font-display)" }}>{data.ce_codigo}</strong> — {data.ce_texto}</p>
+        <p style={{ fontFamily: "var(--font-body)" }}><strong className="text-foreground" style={{ fontFamily: "var(--font-display)" }}>Contenido:</strong> {data.contenido}</p>
+        <p style={{ fontFamily: "var(--font-body)" }}><strong className="text-foreground" style={{ fontFamily: "var(--font-display)" }}>Criterio de logro:</strong> {data.criterio_de_logro}</p>
+        <p className="text-foreground/50" style={{ fontFamily: "var(--font-body)" }}>{data.espacio} · {data.unidad} · Tramo {data.tramo}</p>
       </div>
     </Card>
   );
@@ -616,127 +875,76 @@ function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
     const blob = await pdf(<SecuenciaPDF data={data} nombre={titulo} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `${titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`;
-    a.click();
+    a.href = url; a.download = `${titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`; a.click();
     URL.revokeObjectURL(url);
   };
-
   const exportCSV = () => {
     const bom = "\uFEFF";
     const headers = ["N°", "Recorte", "Meta de aprendizaje", "Plan de aprendizaje", "Recursos"];
-    const rows = data.actividades.map((a) => [
-      String(a.numero), a.recorte, a.meta_aprendizaje,
-      a.plan_aprendizaje.join("\n"), a.recursos ?? "",
-    ]);
-    const csv = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+    const rows = data.actividades.map((a) => [String(a.numero), a.recorte, a.meta_aprendizaje, a.plan_aprendizaje.join("\n"), a.recursos ?? ""]);
+    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `secuencia.csv`; a.click();
+    a.href = url; a.download = "secuencia.csv"; a.click();
     URL.revokeObjectURL(url);
   };
-
-  const titulo = `${data.espacio} — ${data.unidad_curricular}`;
-
   return (
     <Card variant="secondary" className="p-4 rounded-2xl space-y-4 w-full">
-      {/* Botones de exportación */}
       <div className="flex justify-end gap-2">
-        <button
-          onClick={exportCSV}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-        >
-          <ExportIcon /> Excel
-        </button>
-        <button
-          onClick={handleExportPDF}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-        >
-          <PdfIcon /> PDF
-        </button>
+        <ExportBtn onClick={exportCSV} label="Excel" icon={<ExportIcon />} />
+        <ExportBtn onClick={handleExportPDF} label="PDF" icon={<PdfIcon />} />
       </div>
-
-      {/* Encabezado curricular */}
       <div className="rounded-xl border border-border overflow-hidden text-xs">
         <div className="grid grid-cols-2 border-b border-border">
           <div className="px-3 py-2 border-r border-border">
-            <span className="font-semibold uppercase tracking-wide text-muted-foreground">Espacio: </span>
-            <span className="text-foreground">{data.espacio}</span>
+            <span className="font-semibold uppercase tracking-wide text-muted-foreground" style={{ fontFamily: "var(--font-display)" }}>Espacio: </span>
+            <span className="text-foreground" style={{ fontFamily: "var(--font-body)" }}>{data.espacio}</span>
           </div>
           <div className="px-3 py-2">
-            <span className="font-semibold uppercase tracking-wide text-muted-foreground">Unidad curricular: </span>
-            <span className="text-foreground">{data.unidad_curricular}</span>
+            <span className="font-semibold uppercase tracking-wide text-muted-foreground" style={{ fontFamily: "var(--font-display)" }}>Unidad curricular: </span>
+            <span className="text-foreground" style={{ fontFamily: "var(--font-body)" }}>{data.unidad_curricular}</span>
           </div>
         </div>
-        {data.competencias_generales.length > 0 && (
-          <div className="px-3 py-2 border-b border-border">
-            <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1">Competencias generales:</p>
-            <ul className="space-y-0.5 pl-3">
-              {data.competencias_generales.map((c, i) => <li key={i} className="text-foreground/80 list-disc">{c}</li>)}
-            </ul>
-          </div>
-        )}
-        {data.competencias_especificas.length > 0 && (
-          <div className="px-3 py-2 border-b border-border">
-            <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1">Competencias específicas:</p>
-            <ul className="space-y-0.5 pl-3">
-              {data.competencias_especificas.map((c, i) => <li key={i} className="text-foreground/80 list-disc">{c}</li>)}
-            </ul>
-          </div>
-        )}
-        {data.criterios_de_logro.length > 0 && (
-          <div className="px-3 py-2 border-b border-border">
-            <p className="font-semibold uppercase tracking-wide text-muted-foreground mb-1">Criterios de logro:</p>
-            <ul className="space-y-0.5 pl-3">
-              {data.criterios_de_logro.map((c, i) => <li key={i} className="text-foreground/80 list-disc">{c}</li>)}
-            </ul>
-          </div>
-        )}
         {data.meta_aprendizaje && (
-          <div className="px-3 py-2 border-b border-border bg-accent/5">
-            <span className="font-semibold uppercase tracking-wide text-accent">Meta de aprendizaje: </span>
-            <span className="text-foreground/90">{data.meta_aprendizaje}</span>
+          <div className="px-3 py-2 border-b border-border" style={{ background: "rgba(242,116,5,0.05)" }}>
+            <span className="font-semibold uppercase tracking-wide text-accent" style={{ fontFamily: "var(--font-display)" }}>Meta de aprendizaje: </span>
+            <span className="text-foreground/90" style={{ fontFamily: "var(--font-body)" }}>{data.meta_aprendizaje}</span>
           </div>
         )}
         {data.contenido && (
           <div className="px-3 py-2">
-            <span className="font-semibold uppercase tracking-wide text-muted-foreground">Contenido: </span>
-            <span className="text-foreground/80">{data.contenido}</span>
+            <span className="font-semibold uppercase tracking-wide text-muted-foreground" style={{ fontFamily: "var(--font-display)" }}>Contenido: </span>
+            <span className="text-foreground/80" style={{ fontFamily: "var(--font-body)" }}>{data.contenido}</span>
           </div>
         )}
       </div>
-
-      {/* Tabla de actividades */}
       <div className="overflow-x-auto -mx-1">
         <table className="w-full text-xs border-collapse min-w-[600px] border border-border rounded-xl overflow-hidden">
           <thead>
             <tr className="bg-muted/50">
               {["ACT.", "RECORTE", "META DE APRENDIZAJE", "PLAN DE APRENDIZAJE", "RECURSOS"].map((h) => (
-                <th key={h} className="text-left py-2 px-3 font-semibold text-muted-foreground uppercase tracking-wide border-b border-border whitespace-nowrap">{h}</th>
+                <th key={h} className="text-left py-2 px-3 font-semibold text-muted-foreground uppercase tracking-wide border-b border-border whitespace-nowrap" style={{ fontFamily: "var(--font-display)" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {data.actividades.map((act, i) => (
               <tr key={i} className="border-b border-border/40 align-top">
-                <td className="py-3 px-3 font-bold text-foreground whitespace-nowrap">{act.numero}.</td>
-                <td className="py-3 px-3 text-foreground/80 leading-relaxed min-w-[120px]">{act.recorte}</td>
-                <td className="py-3 px-3 text-foreground/80 leading-relaxed min-w-[160px]">{act.meta_aprendizaje}</td>
+                <td className="py-3 px-3 font-bold text-foreground whitespace-nowrap" style={{ fontFamily: "var(--font-display)" }}>{act.numero}.</td>
+                <td className="py-3 px-3 text-foreground/80 leading-relaxed min-w-[120px]" style={{ fontFamily: "var(--font-body)" }}>{act.recorte}</td>
+                <td className="py-3 px-3 text-foreground/80 leading-relaxed min-w-[160px]" style={{ fontFamily: "var(--font-body)" }}>{act.meta_aprendizaje}</td>
                 <td className="py-3 px-3 leading-relaxed min-w-[240px]">
                   <ul className="space-y-1">
                     {act.plan_aprendizaje.map((paso, j) => (
-                      <li key={j} className="flex gap-2 text-foreground/80">
-                        <span className="text-muted-foreground shrink-0">-</span>
-                        <span>{paso}</span>
+                      <li key={j} className="flex gap-2 text-foreground/80" style={{ fontFamily: "var(--font-body)" }}>
+                        <span className="text-muted-foreground shrink-0">–</span><span>{paso}</span>
                       </li>
                     ))}
                   </ul>
                 </td>
-                <td className="py-3 px-3 text-muted-foreground leading-relaxed min-w-[100px]">
-                  {act.recursos || <span className="text-muted-foreground/30">—</span>}
+                <td className="py-3 px-3 text-muted-foreground leading-relaxed min-w-[100px]" style={{ fontFamily: "var(--font-body)" }}>
+                  {act.recursos || <span className="opacity-30">—</span>}
                 </td>
               </tr>
             ))}
@@ -749,22 +957,20 @@ function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
 
 // ── MultiSelect ───────────────────────────────────────────────────────────────
 
-function MultiSelect({ options, onConfirm }: { options: string[]; onConfirm: (t: string) => void }) {
+function MultiSelect({
+  options, onConfirm, isDark, primaryColor, surfaceLow, onSurface, shadowCard,
+}: {
+  options: string[]; onConfirm: (t: string) => void;
+  isDark: boolean; primaryColor: string; surfaceLow: string;
+  onSurface: string; shadowCard: string;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
-
   const toggle = (opt: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.has(opt) ? next.delete(opt) : next.add(opt);
-      return next;
-    });
-
+    setSelected((prev) => { const next = new Set(prev); next.has(opt) ? next.delete(opt) : next.add(opt); return next; });
   const confirm = () => {
     if (selected.size === 0) return;
-    const ordered = options.filter((o) => selected.has(o)).join(", ");
-    onConfirm(ordered);
+    onConfirm(options.filter((o) => selected.has(o)).join(", "));
   };
-
   return (
     <div className="flex flex-col gap-2 mt-1">
       <div className="flex flex-wrap gap-2">
@@ -772,11 +978,20 @@ function MultiSelect({ options, onConfirm }: { options: string[]; onConfirm: (t:
           <button
             key={opt}
             onClick={() => toggle(opt)}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
-              selected.has(opt)
-                ? "border-accent bg-accent/10 text-accent"
-                : "border-border text-foreground hover:bg-muted"
-            }`}
+            className="rounded-xl transition-all"
+            style={{
+              padding: "0.375rem 0.875rem",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              fontFamily: "var(--font-display)",
+              background: selected.has(opt)
+                ? (isDark ? "rgba(200,100,50,0.20)" : "rgba(242,116,5,0.10)")
+                : surfaceLow,
+              color: selected.has(opt) ? primaryColor : onSurface,
+              border: "none",
+              cursor: "pointer",
+              boxShadow: shadowCard,
+            }}
           >
             {selected.has(opt) && <span className="mr-1">✓</span>}
             {opt}
@@ -786,7 +1001,17 @@ function MultiSelect({ options, onConfirm }: { options: string[]; onConfirm: (t:
       {selected.size > 0 && (
         <button
           onClick={confirm}
-          className="self-start px-4 py-1.5 rounded-xl bg-accent text-accent-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
+          className="self-start rounded-xl transition-all active:scale-95"
+          style={{
+            padding: "0.375rem 1rem",
+            fontSize: "0.75rem",
+            fontWeight: 700,
+            fontFamily: "var(--font-display)",
+            background: primaryColor,
+            color: "#ffffff",
+            border: "none",
+            cursor: "pointer",
+          }}
         >
           Confirmar ({selected.size})
         </button>
@@ -797,30 +1022,56 @@ function MultiSelect({ options, onConfirm }: { options: string[]; onConfirm: (t:
 
 // ── Typing indicator ──────────────────────────────────────────────────────────
 
-function TypingIndicator({ label }: { label: string }) {
+function TypingIndicator({ label, isDark, surfaceLow, onVariant }: { label: string; isDark: boolean; surfaceLow: string; onVariant: string }) {
+  const shadow = isDark ? "0 12px 32px -4px rgba(0,0,0,0.28)" : "0 12px 32px -4px rgba(25,28,30,0.06)";
   return (
     <div className="flex justify-start">
-      <Card variant="secondary" className="px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-2.5">
+      <div
+        className="rounded-2xl rounded-bl-sm flex items-center gap-2.5"
+        style={{ background: surfaceLow, padding: "0.75rem 1rem", boxShadow: shadow }}
+      >
         <div className="flex items-center gap-1">
           {[0, 150, 300].map((delay, i) => (
             <span
               key={i}
-              className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce"
-              style={{ animationDelay: `${delay}ms` }}
+              className="w-1.5 h-1.5 rounded-full animate-bounce"
+              style={{ background: onVariant, animationDelay: `${delay}ms` }}
             />
           ))}
         </div>
-        <span className="text-xs text-muted-foreground">{label}</span>
-      </Card>
+        <span style={{ fontSize: "0.75rem", color: onVariant, fontFamily: "var(--font-body)" }}>{label}</span>
+      </div>
     </div>
   );
 }
 
+// ── ExportBtn helper ──────────────────────────────────────────────────────────
+
+function ExportBtn({ onClick, label, icon }: { onClick: () => void; label: string; icon: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 rounded-xl transition-all hover:opacity-80"
+      style={{
+        padding: "0.375rem 0.75rem",
+        fontSize: "0.72rem",
+        fontFamily: "var(--font-display)",
+        background: "transparent",
+        border: "1px solid rgba(25,28,30,0.10)",
+        color: "var(--muted-foreground)",
+        cursor: "pointer",
+      }}
+    >
+      {icon} {label}
+    </button>
+  );
+}
+
 // ── Iconos ────────────────────────────────────────────────────────────────────
-function ChatIcon({ size = 18 }: { size?: number }) {
+function SparkleIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
     </svg>
   );
 }
@@ -848,7 +1099,7 @@ function CopyIcon() {
 }
 function ExportIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
@@ -857,7 +1108,7 @@ function ExportIcon() {
 }
 function PdfIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <polyline points="14 2 14 8 20 8" />
       <line x1="9" y1="13" x2="15" y2="13" />

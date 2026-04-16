@@ -1,35 +1,113 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
 @import "tailwindcss";
 @import "@heroui/styles";
 
-/* ── Educational Editorial — Brand tokens ────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════════
+   Design System — "The Academic Architect"
+   Palette: Material Color System anchored in brand orange + charcoal
+   ══════════════════════════════════════════════════════════════════════════════ */
+
 :root {
-  /* Primary orange */
-  --accent: oklch(0.65 0.20 40);
-  --accent-foreground: oklch(0.98 0 0);
+  /* ── Primary (brand orange) ── */
+  --primary:           #F27405;
+  --primary-container: #F27405;
+  --on-primary:        #ffffff;
+  --primary-fixed-dim: #ffb68f;
 
-  /* Semantic */
-  --success: oklch(0.4 0.14 145);
-  --success-foreground: oklch(0.98 0 0);
+  /* ── Secondary ── */
+  --secondary-container:    #dae3f0;
+  --on-secondary-container: #5c6570;
 
-  /* Surfaces */
-  --surface: #F8F9FA;
-  --surface-container-low: #F1F4F5;
-  --surface-container-lowest: #FFFFFF;
-  --surface-container-high: #E5E9EB;
+  /* ── Tertiary — "Pedagogical Insight" blue ── */
+  --tertiary:           #124af0;
+  --tertiary-container: #8197ff;
+  --on-tertiary:        #ffffff;
+
+  /* ── Surfaces (tonal depth, no border lines) ── */
+  --surface:                   #f9f9fd;
+  --surface-container-lowest:  #ffffff;
+  --surface-container-low:     #f3f3f7;
+  --surface-container:         #eeecf0;
+  --surface-container-high:    #e8e6ea;
+  --surface-container-highest: #e3e1e4;
+
+  /* ── On-surfaces ── */
+  --on-surface:         #191c1e;
+  --on-surface-variant: #574238;
+
+  /* ── Outlines ── */
+  --outline:         #8a7266;
+  --outline-variant: #dec1b3;
+
+  /* ── Inverse ── */
+  --inverse-surface:    #2e3133;
+  --on-inverse-surface: #eff0f1;
+
+  /* ── Semantic ── */
+  --success:     #16a34a;
+  --destructive: #dc2626;
+
+  /* ── Elevation shadow ── */
+  --shadow-ambient: 0 12px 32px -4px rgba(25, 28, 30, 0.06);
+  --shadow-hover:   0 12px 32px -4px rgba(25, 28, 30, 0.12);
+
+  /* ── Typography ── */
+  --font-display: 'Manrope', sans-serif;
+  --font-body:    'Public Sans', sans-serif;
+
+  /* ── Legacy tokens (kept for HeroUI compatibility) ── */
+  --accent:             oklch(0.65 0.20 40);
+  --accent-foreground:  #ffffff;
+  --foreground:         #191c1e;
+  --muted-foreground:   #6b7280;
+  --border:             rgba(222, 193, 179, 0.40);
+  --muted:              #f3f3f7;
 }
 
-/* ── dark mode overrides ─────────────────────────────────────────────────── */
+/* ── Dark mode ─────────────────────────────────────────────────────────────── */
 .dark {
-  --accent: oklch(0.72 0.20 40);
-  --surface: #0f172a;
-  --surface-container-low: #111827;
-  --surface-container-lowest: #1e293b;
-  --surface-container-high: #0a0f1a;
+  --primary:           oklch(0.72 0.16 38);
+  --primary-container: oklch(0.72 0.16 38);
+  --on-primary:        #ffffff;
+  --primary-fixed-dim: oklch(0.80 0.12 38);
+
+  --secondary-container:    #3a4550;
+  --on-secondary-container: #c0cdd8;
+
+  --tertiary:           #bdceff;
+  --tertiary-container: #2e47c7;
+  --on-tertiary:        #ffffff;
+
+  --surface:                   #101213;
+  --surface-container-lowest:  #0b0d0f;
+  --surface-container-low:     #191c1e;
+  --surface-container:         #1e2022;
+  --surface-container-high:    #262a2c;
+  --surface-container-highest: #313537;
+
+  --on-surface:         #e2e0dd;
+  --on-surface-variant: #d3bcaf;
+
+  --outline:         #9c8578;
+  --outline-variant: #574238;
+
+  --inverse-surface:    #e2e0dd;
+  --on-inverse-surface: #2e3133;
+
+  --shadow-ambient: 0 12px 32px -4px rgba(0, 0, 0, 0.28);
+  --shadow-hover:   0 12px 32px -4px rgba(0, 0, 0, 0.40);
+
+  /* HeroUI compat */
+  --accent:           oklch(0.72 0.16 38);
+  --foreground:       #e2e0dd;
+  --muted-foreground: #d3bcaf;
+  --border:           rgba(87, 66, 56, 0.50);
+  --muted:            #191c1e;
 }
 
-html,
-body {
+/* ── Base ───────────────────────────────────────────────────────────────────── */
+
+html, body {
   max-width: 100vw;
   overflow-x: hidden;
 }
@@ -38,7 +116,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--surface);
-  font-family: 'Inter', sans-serif;
+  color: var(--on-surface);
+  font-family: var(--font-body);
 }
 
 * {
