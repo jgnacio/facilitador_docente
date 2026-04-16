@@ -310,6 +310,7 @@ export default function DashboardTab({ onNavigate }: Props) {
               shadow={shadowAmbient}
               onSurface={onSurface}
               onSurfaceVariant={onSurfaceVariant}
+              primaryColor={primaryColor}
             />
           )}
         </aside>
@@ -527,11 +528,11 @@ function QuickAction({
 }
 
 function ProgressCard({
-  plans, students, isDark, cardBg, shadow, onSurface, onSurfaceVariant,
+  plans, students, isDark, cardBg, shadow, onSurface, onSurfaceVariant, primaryColor,
 }: {
   plans: number; students: number;
   isDark: boolean; cardBg: string; shadow: string;
-  onSurface: string; onSurfaceVariant: string;
+  onSurface: string; onSurfaceVariant: string; primaryColor: string;
 }) {
   const plansGoal    = 10;
   const studentsGoal = 30;
