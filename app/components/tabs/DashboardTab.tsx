@@ -212,7 +212,7 @@ export default function DashboardTab({ onNavigate }: Props) {
       >
 
         {/* ── Recent plans ──────────────────────────────────────────────── */}
-        <section>
+        <section style={{ minWidth: 0, overflow: "hidden" }}>
           <SectionHeader
             title="Planificaciones recientes"
             action="Ver todas"

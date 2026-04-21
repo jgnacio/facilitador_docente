@@ -293,14 +293,15 @@ export default function AppShell() {
 
       {/* ── Main Content ──────────────────────────────────────────────────── */}
       <main
-        className={activeTab === "asistente" ? "flex flex-col" : "overflow-y-auto"}
+        className={activeTab === "asistente" ? "flex flex-col" : ""}
         style={{
           marginLeft: isMobile ? "0" : "256px",
           paddingTop: "64px",
           paddingBottom: isMobile ? "72px" : "0",
+          overflowX: "hidden",
           ...(activeTab === "asistente"
-            ? { height: "100vh", overflow: "hidden" }
-            : { minHeight: "100vh" }),
+            ? { height: "100vh", overflowY: "hidden" }
+            : { minHeight: "100vh", overflowY: "auto" }),
         }}
       >
         {activeTab === "dashboard"       && <DashboardTab onNavigate={(t) => setActiveTab(t as Tab)} />}
