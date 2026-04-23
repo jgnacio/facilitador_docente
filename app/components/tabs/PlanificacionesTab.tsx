@@ -11,6 +11,7 @@ import {
   deletePlanificacion, updatePlanificacion,
   type Planificacion,
 } from "../../api-actions";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 type View = "list" | "detail" | "edit";
 
@@ -93,21 +94,19 @@ function parseChatExportado(raw: string): PlanParsed | null {
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function PlanificacionesTab({ onGoToPlanificador }: { onGoToPlanificador: () => void }) {
+  const queryClient = useQueryClient();
   const [view, setView]         = useState<View>("list");
-  const [plans, setPlans]       = useState<Planificacion[]>([]);
   const [selected, setSelected] = useState<Planificacion | null>(null);
-  const [loading, setLoading]   = useState(true);
   const [apiError, setApiError] = useState(false);
 
-  const reload = () => {
-    setLoading(true);
-    setApiError(false);
-    getPlanificaciones()
-      .then((p) => { setPlans(p); setLoading(false); })
-      .catch(() => { setApiError(true); setLoading(false); });
-  };
+  const { data: plans = [], isPending: loadingPlans } = useQuery({
+    queryKey: ["planificaciones"],
+    queryFn: getPlanificaciones,
+  });
 
-  useEffect(() => { reload(); }, []);
+  const loading = loadingPlans;
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["planificaciones"] });
 
   const openDetail = async (id: number) => {
     const p = await getPlanificacion(id);
@@ -119,7 +118,7 @@ export default function PlanificacionesTab({ onGoToPlanificador }: { onGoToPlani
     await deletePlanificacion(id);
     setView("list");
     setSelected(null);
-    reload();
+    refresh();
   };
 
   if (view === "edit" && selected) {
@@ -127,7 +126,7 @@ export default function PlanificacionesTab({ onGoToPlanificador }: { onGoToPlani
       <PlanForm
         plan={selected}
         onBack={() => setView("detail")}
-        onSaved={(updated) => { setSelected(updated); setView("detail"); reload(); }}
+        onSaved={(updated) => { setSelected(updated); setView("detail"); refresh(); }}
       />
     );
   }

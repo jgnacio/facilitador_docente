@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
 @import "tailwindcss";
 @import "@heroui/styles";
 
@@ -11,10 +10,10 @@
   color-scheme: light dark;
 
   /* ── Primary (brand orange) ── */
-  --primary:           #F27405;
-  --primary-container: #F27405;
+  --primary:           #F47D31;
+  --primary-container: #F47D31;
   --on-primary:        #ffffff;
-  --primary-fixed-dim: #ffb68f;
+  --primary-fixed-dim: #F47D31;
 
   /* ── Secondary ── */
   --secondary-container:    #dae3f0;
@@ -26,16 +25,16 @@
   --on-tertiary:        #ffffff;
 
   /* ── Surfaces (tonal depth, no border lines) ── */
-  --surface:                   #f9f9fd;
+  --surface:                   #FAF9F7;
   --surface-container-lowest:  #ffffff;
-  --surface-container-low:     #f3f3f7;
-  --surface-container:         #eeecf0;
-  --surface-container-high:    #e8e6ea;
-  --surface-container-highest: #e3e1e4;
+  --surface-container-low:     #F3F2F0;
+  --surface-container:         #EBEAE8;
+  --surface-container-high:    #E1E0DE;
+  --surface-container-highest: #D8D7D5;
 
   /* ── On-surfaces ── */
-  --on-surface:         #191c1e;
-  --on-surface-variant: #574238;
+  --on-surface:         #1c1917;
+  --on-surface-variant: #57534e;
 
   /* ── Outlines ── */
   --outline:         #8a7266;
@@ -54,8 +53,8 @@
   --shadow-hover:   0 12px 32px -4px rgba(25, 28, 30, 0.12);
 
   /* ── Typography ── */
-  --font-display: 'Manrope', sans-serif;
-  --font-body:    'Public Sans', sans-serif;
+  --font-display: var(--font-fraunces), serif;
+  --font-body:    var(--font-dm-sans), sans-serif;
 
   /* ── Legacy tokens (kept for HeroUI compatibility) ── */
   --accent:             oklch(0.65 0.20 40);
@@ -70,6 +69,10 @@
   --topbar-bg:     rgba(255, 255, 255, 0.80);
   --active-nav-bg: rgba(156, 68, 0, 0.06);
   --hover-bg:      rgba(242, 116, 5, 0.08);
+
+  /* ── Brand Opacity Tokens ── */
+  --primary-subtle:  rgba(242, 116, 5, 0.08);
+  --tertiary-subtle: rgba(18, 74, 240, 0.07);
 }
 
 /* ── Dark mode ─────────────────────────────────────────────────────────────── */
@@ -86,12 +89,12 @@
   --tertiary-container: #2e47c7;
   --on-tertiary:        #ffffff;
 
-  --surface:                   #101213;
-  --surface-container-lowest:  #0b0d0f;
-  --surface-container-low:     #191c1e;
-  --surface-container:         #1e2022;
-  --surface-container-high:    #262a2c;
-  --surface-container-highest: #313537;
+  --surface:                   #111111;
+  --surface-container-lowest:  #0a0a0a;
+  --surface-container-low:     #1a1a1a;
+  --surface-container:         #242424;
+  --surface-container-high:    #2d2d2d;
+  --surface-container-highest: #363636;
 
   --on-surface:         #e2e0dd;
   --on-surface-variant: #d3bcaf;
@@ -117,6 +120,10 @@
   --topbar-bg:     rgba(10, 12, 14, 0.82);
   --active-nav-bg: rgba(255, 182, 143, 0.10);
   --hover-bg:      rgba(200, 100, 50, 0.12);
+
+  /* ── Brand Opacity Tokens ── */
+  --primary-subtle:  rgba(200, 100, 50, 0.16);
+  --tertiary-subtle: rgba(129, 151, 255, 0.14);
 }
 
 /* ── Base ───────────────────────────────────────────────────────────────────── */
@@ -132,6 +139,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
 }
 
 * {

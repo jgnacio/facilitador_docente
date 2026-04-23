@@ -7,6 +7,7 @@ import {
   Select, ListBox,
 } from "@heroui/react";
 import { getAlumnos, createAlumno, updateAlumno, deleteAlumno, type Alumno } from "../../api-actions";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const NIVELES = ["Inicial", "Primaria", "Secundaria"];
 const GRADOS = [
@@ -28,18 +29,17 @@ function avatarColor(name: string): "default" | "accent" | "success" | "warning"
 type View = "list" | "create" | "edit";
 
 export default function AlumnosTab() {
+  const queryClient = useQueryClient();
   const [view, setView]         = useState<View>("list");
-  const [alumnos, setAlumnos]   = useState<Alumno[]>([]);
   const [editing, setEditing]   = useState<Alumno | null>(null);
-  const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState("");
 
-  const reload = () => {
-    setLoading(true);
-    getAlumnos().then((a) => { setAlumnos(a); setLoading(false); });
-  };
+  const { data: alumnos = [], isPending: loading } = useQuery({
+    queryKey: ["alumnos"],
+    queryFn: getAlumnos,
+  });
 
-  useEffect(() => { reload(); }, []);
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["alumnos"] });
 
   const filtered = alumnos.filter((a) =>
     a.nombre_completo.toLowerCase().includes(search.toLowerCase())
@@ -50,14 +50,14 @@ export default function AlumnosTab() {
   const handleDelete = async (a: Alumno) => {
     if (!confirm(`¿Eliminar a ${a.nombre_completo}? Esta acción no se puede deshacer.`)) return;
     await deleteAlumno(a.id);
-    reload();
+    refresh();
   };
 
   if (view === "create") {
     return (
       <AlumnoForm
         onBack={() => setView("list")}
-        onSaved={() => { setView("list"); reload(); }}
+        onSaved={() => { setView("list"); refresh(); }}
       />
     );
   }
@@ -67,7 +67,7 @@ export default function AlumnosTab() {
       <AlumnoForm
         alumno={editing}
         onBack={() => { setView("list"); setEditing(null); }}
-        onSaved={() => { setView("list"); setEditing(null); reload(); }}
+        onSaved={() => { setView("list"); setEditing(null); refresh(); }}
       />
     );
   }

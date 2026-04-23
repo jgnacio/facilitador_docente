@@ -67,6 +67,13 @@ function stripTokens(text: string): string {
     .trim();
 }
 
+const generateId = () => {
+  if (typeof window !== "undefined" && window.crypto && window.crypto.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2, 11);
+};
+
 const SESSION_ID = `web-${Math.random().toString(36).slice(2, 10)}`;
 
 function parseAgentResponse(data: unknown): {
@@ -137,31 +144,34 @@ const QUICK_PROMPTS = [
 
 // ── Markdown renderer — react-markdown + remark-gfm ──────────────────────────
 function MarkdownContent({ text, onSurface, onVariant }: { text: string; onSurface: string; onVariant: string }) {
+  const displayFont = "var(--font-fraunces)";
+  const bodyFont    = "var(--font-dm-sans)";
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
-        h1: ({ children }) => <h2 className="font-bold text-lg mt-3 mb-1" style={{ color: onSurface, letterSpacing: "-0.02em" }}>{children}</h2>,
-        h2: ({ children }) => <h3 className="font-bold text-base mt-3 mb-1" style={{ color: onSurface, letterSpacing: "-0.02em" }}>{children}</h3>,
-        h3: ({ children }) => <h4 className="font-bold text-sm mt-3 mb-1" style={{ color: onSurface, letterSpacing: "-0.01em" }}>{children}</h4>,
-        p:  ({ children }) => <p className="text-sm leading-relaxed mb-2" style={{ color: onSurface }}>{children}</p>,
-        ul: ({ children }) => <ul className="mb-2 space-y-0.5">{children}</ul>,
-        ol: ({ children }) => <ol className="mb-2 space-y-0.5 list-decimal ml-4">{children}</ol>,
-        li: ({ children }) => <li className="text-sm leading-relaxed ml-4 list-disc" style={{ color: onSurface }}>{children}</li>,
-        strong: ({ children }) => <strong style={{ color: onSurface }}>{children}</strong>,
-        em: ({ children }) => <em style={{ color: onVariant }}>{children}</em>,
-        code: ({ children }) => <code className="rounded px-1 font-mono text-xs" style={{ background: "rgba(0,0,0,0.08)", color: onSurface }}>{children}</code>,
-        hr: () => <hr className="my-3 border-t" style={{ borderColor: "rgba(127,127,127,0.2)" }} />,
+        h1: ({ children }) => <h2 className="font-bold text-lg mt-3 mb-1" style={{ color: onSurface, letterSpacing: "-0.02em", fontFamily: displayFont }}>{children}</h2>,
+        h2: ({ children }) => <h3 className="font-bold text-base mt-3 mb-1" style={{ color: onSurface, letterSpacing: "-0.02em", fontFamily: displayFont }}>{children}</h3>,
+        h3: ({ children }) => <h4 className="font-bold text-sm mt-3 mb-1" style={{ color: onSurface, letterSpacing: "-0.01em", fontFamily: displayFont }}>{children}</h4>,
+        p:  ({ children }) => <p className="text-sm leading-relaxed mb-2" style={{ color: onSurface, fontFamily: "var(--font-fraunces)", fontSize: "1rem", letterSpacing: "-0.01em" }}>{children}</p>,
+        ul: ({ children }) => <ul className="mb-2 space-y-1" style={{ fontFamily: bodyFont }}>{children}</ul>,
+        ol: ({ children }) => <ol className="mb-2 space-y-1 list-decimal ml-4" style={{ fontFamily: bodyFont }}>{children}</ol>,
+        li: ({ children }) => <li className="text-sm leading-relaxed ml-4 list-disc" style={{ color: onSurface, fontFamily: bodyFont }}>{children}</li>,
+        strong: ({ children }) => <strong style={{ color: "var(--primary)", fontWeight: 700, fontFamily: displayFont, fontStyle: "italic" }}>{children}</strong>,
+        em: ({ children }) => <em style={{ color: "var(--primary)", fontFamily: displayFont, fontStyle: "italic", opacity: 0.9 }}>{children}</em>,
+        code: ({ children }) => <code className="rounded px-1 font-mono text-xs" style={{ background: "var(--surface-container-high)", color: onSurface }}>{children}</code>,
+        hr: () => <hr className="my-3 border-t" style={{ borderColor: "rgba(127, 127, 127, 0.15)" }} />,
         table: ({ children }) => (
-          <div className="overflow-x-auto my-3 rounded-lg border" style={{ borderColor: "rgba(127,127,127,0.2)" }}>
-            <table className="w-full text-sm border-collapse">{children}</table>
+          <div className="overflow-x-auto my-3 rounded-xl border" style={{ borderColor: "rgba(127, 127, 127, 0.15)", background: "var(--surface-container-lowest)" }}>
+            <table className="w-full text-sm border-collapse" style={{ fontFamily: bodyFont }}>{children}</table>
           </div>
         ),
-        thead: ({ children }) => <thead style={{ background: "rgba(127,127,127,0.08)" }}>{children}</thead>,
-        tr: ({ children }) => <tr className="border-t" style={{ borderColor: "rgba(127,127,127,0.15)" }}>{children}</tr>,
-        th: ({ children }) => <th className="px-3 py-2 text-left font-semibold text-xs" style={{ color: onSurface }}>{children}</th>,
-        td: ({ children }) => <td className="px-3 py-2 text-xs" style={{ color: onSurface }}>{children}</td>,
-        blockquote: ({ children }) => <blockquote className="border-l-2 pl-3 my-2 italic" style={{ borderColor: "rgba(127,127,127,0.4)", color: onVariant }}>{children}</blockquote>,
+        thead: ({ children }) => <thead style={{ background: "var(--surface-container-low)" }}>{children}</thead>,
+        tr: ({ children }) => <tr className="border-t" style={{ borderColor: "rgba(127, 127, 127, 0.1)" }}>{children}</tr>,
+        th: ({ children }) => <th className="px-3 py-2 text-left font-bold text-xs" style={{ color: onSurface, fontFamily: displayFont }}>{children}</th>,
+        td: ({ children }) => <td className="px-3 py-2 text-xs" style={{ color: onSurface, fontFamily: bodyFont }}>{children}</td>,
+        blockquote: ({ children }) => <blockquote className="border-l-4 pl-3 my-2 italic" style={{ borderColor: "var(--primary)", color: onVariant, fontFamily: bodyFont }}>{children}</blockquote>,
       }}
     >
       {text}
@@ -205,7 +215,7 @@ export default function AsistenteTab() {
     if (!t || loading || !sessionReady) return;
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", text: t, refs: [] }]);
+    setMessages((prev) => [...prev, { id: generateId(), role: "user", text: t, refs: [] }]);
     setLoading(true);
     setStatusLabel("Pensando…");
     setStreamingText("");
@@ -245,7 +255,7 @@ export default function AsistenteTab() {
             setStreamingText("");
             const reply = parseAgentResponse({ session_id: evt.session_id, response: evt.response });
             setMessages((prev) => [...prev, {
-              id: crypto.randomUUID(), role: "agent",
+              id: generateId(), role: "agent",
               text: reply.text, refs: reply.refs,
               curriculum_match: reply.curriculum_match,
               planificacion: reply.planificacion,
@@ -256,7 +266,7 @@ export default function AsistenteTab() {
         }
       }
     } catch {
-      setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "error", text: "Error de conexión.", refs: [] }]);
+      setMessages((prev) => [...prev, { id: generateId(), role: "error", text: "Error de conexión.", refs: [] }]);
       setLoading(false);
     }
   };
@@ -296,7 +306,8 @@ export default function AsistenteTab() {
           <button
             onClick={reset}
             aria-label="Nueva sesión"
-            className="rounded-xl transition-all active:scale-95 p-2 text-muted-foreground hover:bg-muted"
+            className="rounded-xl transition-all active:scale-95 p-2"
+            style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}
           >
             <ResetIcon />
           </button>
@@ -400,7 +411,7 @@ export default function AsistenteTab() {
               fontSize: "1rem",
               lineHeight: "1.5",
               color: onSurface,
-              fontFamily: "var(--font-body)",
+              fontFamily: "var(--font-fraunces)",
               maxHeight: "200px",
               overflowY: "auto",
             }}
@@ -499,7 +510,12 @@ const WelcomeScreen = memo(({
   onSurface: string; onVariant: string; shadowCard: string;
 }) => {
 
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   
   return (
     <div className="flex flex-col items-center justify-center flex-1 gap-4 py-8 px-2">
@@ -508,7 +524,7 @@ const WelcomeScreen = memo(({
           className="text-4xl md:text-5xl font-medium tracking-tight mb-2"
           style={{ fontFamily: "var(--font-display)", color: "var(--on-surface)" }}
         >
-          Hola, <span style={{ color: "var(--primary)" }}>{user?.firstName || "Colega"}</span>
+          Hola, <span style={{ color: "var(--primary)" }}>{(mounted && isLoaded) ? (user?.firstName || "Colega") : "Colega"}</span>
         </h2>
         <h3
           className="text-3xl md:text-4xl font-light tracking-tight opacity-30"
@@ -568,9 +584,10 @@ const Bubble = memo(({
               background: primaryColor,
               color: "#ffffff",
               padding: "0.75rem 1rem",
-              fontSize: "0.875rem",
-              lineHeight: 1.6,
-              fontFamily: "var(--font-body)",
+              fontSize: "0.9375rem",
+              lineHeight: 1.5,
+              fontFamily: "var(--font-fraunces)",
+              letterSpacing: "-0.01em",
             }}
           >
             {message.text}
@@ -585,6 +602,8 @@ const Bubble = memo(({
               padding: "0.875rem 1rem",
               boxShadow: isError ? "none" : shadowCard,
               color: isError ? "#dc2626" : onSurface,
+              fontFamily: "var(--font-fraunces)",
+              letterSpacing: "-0.01em",
             }}
           >
             <MarkdownContent text={bodyText} onSurface={onSurface} onVariant={onVariant} />
@@ -665,8 +684,8 @@ const Bubble = memo(({
                 className="inline-flex items-center gap-1.5 rounded-xl transition-opacity hover:opacity-80"
                 style={{
                   padding: "0.25rem 0.75rem",
-                  background: "rgba(18,74,240,0.08)",
-                  color: "#124af0",
+                  background: "var(--tertiary-subtle)",
+                  color: "var(--tertiary)",
                   fontSize: "0.72rem",
                   fontWeight: 600,
                   fontFamily: "var(--font-body)",
@@ -780,10 +799,10 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
     a.href = url; a.download = `${data.titulo.replace(/\s+/g, "_").slice(0, 60)}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
-  const momentoColor: Record<string, string> = {
-    Inicio:     "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-    Desarrollo: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-    Cierre:     "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+  const momentoColor: Record<string, { bg: string; text: string }> = {
+    Inicio:     { bg: "var(--tertiary-subtle)", text: "var(--tertiary)" },
+    Desarrollo: { bg: "rgba(22, 163, 74, 0.1)", text: "var(--success)" },
+    Cierre:     { bg: "var(--primary-subtle)", text: "var(--primary)" },
   };
   return (
     <Card variant="secondary" className="p-4 rounded-2xl space-y-4 w-full">
@@ -799,8 +818,8 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
       </div>
       {data.justificacion && <p className="text-xs text-foreground/80 leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{data.justificacion}</p>}
       {data.metodologia && (
-        <div className="px-3 py-2.5 rounded-xl" style={{ background: "rgba(242,116,5,0.08)" }}>
-          <p className="text-xs font-semibold text-accent" style={{ fontFamily: "var(--font-display)" }}>{data.metodologia}</p>
+        <div className="px-3 py-2.5 rounded-xl" style={{ background: "var(--primary-subtle)" }}>
+          <p className="text-xs font-bold" style={{ color: "var(--primary)", fontFamily: "var(--font-display)" }}>{data.metodologia}</p>
           {data.metodologia_descripcion && <p className="text-xs text-foreground/70 mt-0.5 leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{data.metodologia_descripcion}</p>}
         </div>
       )}
@@ -814,18 +833,30 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
             </tr>
           </thead>
           <tbody>
-            {data.momentos.map((m, i) => (
-              <tr key={i} className="border-b border-border/40 align-top">
-                <td className="py-3 pr-3 pl-1 whitespace-nowrap">
-                  <span className={`px-2 py-0.5 rounded-full font-medium text-xs ${momentoColor[m.momento] ?? "bg-muted text-foreground"}`} style={{ fontFamily: "var(--font-display)" }}>{m.momento}</span>
-                </td>
-                <td className="py-3 pr-3 text-muted-foreground whitespace-nowrap" style={{ fontFamily: "var(--font-body)" }}>{m.duracion}</td>
-                <td className="py-3 pr-3 leading-relaxed font-medium text-foreground/90" style={{ fontFamily: "var(--font-body)" }}>{m.meta_aprendizaje ?? <span className="text-muted-foreground/40 italic">—</span>}</td>
-                <td className="py-3 pr-3 leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{m.actividad}</td>
-                <td className="py-3 pr-3 leading-relaxed text-muted-foreground" style={{ fontFamily: "var(--font-body)" }}>{m.rol_docente}</td>
-                <td className="py-3 leading-relaxed text-muted-foreground" style={{ fontFamily: "var(--font-body)" }}>{m.recursos}</td>
-              </tr>
-            ))}
+              {data.momentos.map((m, i) => {
+                const colors = momentoColor[m.momento] || { bg: "var(--surface-container-low)", text: "var(--on-surface)" };
+                return (
+                  <tr key={i} className="border-b border-border/40 align-top">
+                    <td className="py-3 pr-3 pl-1 whitespace-nowrap">
+                      <span
+                        className="px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider"
+                        style={{
+                          background: colors.bg,
+                          color: colors.text,
+                          fontFamily: "var(--font-display)",
+                        }}
+                      >
+                        {m.momento}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 text-muted-foreground whitespace-nowrap" style={{ fontFamily: "var(--font-body)" }}>{m.duracion}</td>
+                    <td className="py-3 pr-3 leading-relaxed font-medium text-foreground/90" style={{ fontFamily: "var(--font-body)" }}>{m.meta_aprendizaje ?? <span className="text-muted-foreground/40 italic">—</span>}</td>
+                    <td className="py-3 pr-3 leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{m.actividad}</td>
+                    <td className="py-3 pr-3 leading-relaxed text-muted-foreground" style={{ fontFamily: "var(--font-body)" }}>{m.rol_docente}</td>
+                    <td className="py-3 leading-relaxed text-muted-foreground" style={{ fontFamily: "var(--font-body)" }}>{m.recursos}</td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </div>
@@ -881,8 +912,8 @@ function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
           </div>
         </div>
         {data.meta_aprendizaje && (
-          <div className="px-3 py-2 border-b border-border" style={{ background: "rgba(242,116,5,0.05)" }}>
-            <span className="font-semibold uppercase tracking-wide text-accent" style={{ fontFamily: "var(--font-display)" }}>Meta de aprendizaje: </span>
+          <div className="px-3 py-2 border-b border-border" style={{ background: "var(--primary-subtle)" }}>
+            <span className="font-bold uppercase tracking-wide" style={{ color: "var(--primary)", fontFamily: "var(--font-display)" }}>Meta de aprendizaje: </span>
             <span className="text-foreground/90" style={{ fontFamily: "var(--font-body)" }}>{data.meta_aprendizaje}</span>
           </div>
         )}
