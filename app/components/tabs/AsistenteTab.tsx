@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useEffect, useRef, useState, memo } from "react";
+
+import { motion, AnimatePresence } from "motion/react";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import { Button, Card } from "@heroui/react";
 import { createAdkSession, type PdfRef } from "../../api-actions";
-import { BookOpen, HeartHandshake, Layers, Lightbulb, Sparkles } from "lucide-react";
+import { BookOpen, HeartHandshake, Layers, Lightbulb, Sparkles, Plus, Mic, Hammer, SendHorizontal, RotateCcw } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
 
@@ -102,7 +106,7 @@ const QUICK_PROMPTS = [
   {
     label: "Quiero planificar una clase para esta semana",
     subtext: "Te genero una planificación lista para usar",
-    icon: <Sparkles size={18} color="white" />,
+    icon: <Sparkles size={18} />,
     featured: true,
   },
   {
@@ -131,26 +135,38 @@ const QUICK_PROMPTS = [
   },
 ];
 
-// ── Minimal markdown renderer ─────────────────────────────────────────────────
-function renderMarkdown(text: string): React.ReactNode[] {
-  return text.split("\n").map((line, i) => {
-    if (/^###\s/.test(line)) return <h4 key={i} className="font-bold text-sm mt-3 mb-1" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.01em" }}>{line.slice(4)}</h4>;
-    if (/^##\s/.test(line))  return <h3 key={i} className="font-bold text-base mt-3 mb-1" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>{line.slice(3)}</h3>;
-    if (/^#\s/.test(line))   return <h2 key={i} className="font-bold text-lg mt-3 mb-1" style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}>{line.slice(2)}</h2>;
-    if (/^[-*]\s/.test(line)) return <li key={i} className="ml-4 list-disc text-sm leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{inline(line.slice(2))}</li>;
-    if (/^\d+\.\s/.test(line)) return <li key={i} className="ml-4 list-decimal text-sm leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{inline(line.replace(/^\d+\.\s/, ""))}</li>;
-    if (line.trim() === "") return <br key={i} />;
-    return <p key={i} className="text-sm leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{inline(line)}</p>;
-  });
-}
-
-function inline(text: string): React.ReactNode {
-  return text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g).map((p, i) => {
-    if (p.startsWith("**") && p.endsWith("**")) return <strong key={i} style={{ fontFamily: "var(--font-display)" }}>{p.slice(2, -2)}</strong>;
-    if (p.startsWith("`")  && p.endsWith("`"))  return <code key={i} className="rounded px-1 font-mono text-xs" style={{ background: "rgba(0,0,0,0.08)" }}>{p.slice(1, -1)}</code>;
-    if (p.startsWith("*")  && p.endsWith("*"))  return <em key={i}>{p.slice(1, -1)}</em>;
-    return p;
-  });
+// ── Markdown renderer — react-markdown + remark-gfm ──────────────────────────
+function MarkdownContent({ text, onSurface, onVariant }: { text: string; onSurface: string; onVariant: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        h1: ({ children }) => <h2 className="font-bold text-lg mt-3 mb-1" style={{ color: onSurface, letterSpacing: "-0.02em" }}>{children}</h2>,
+        h2: ({ children }) => <h3 className="font-bold text-base mt-3 mb-1" style={{ color: onSurface, letterSpacing: "-0.02em" }}>{children}</h3>,
+        h3: ({ children }) => <h4 className="font-bold text-sm mt-3 mb-1" style={{ color: onSurface, letterSpacing: "-0.01em" }}>{children}</h4>,
+        p:  ({ children }) => <p className="text-sm leading-relaxed mb-2" style={{ color: onSurface }}>{children}</p>,
+        ul: ({ children }) => <ul className="mb-2 space-y-0.5">{children}</ul>,
+        ol: ({ children }) => <ol className="mb-2 space-y-0.5 list-decimal ml-4">{children}</ol>,
+        li: ({ children }) => <li className="text-sm leading-relaxed ml-4 list-disc" style={{ color: onSurface }}>{children}</li>,
+        strong: ({ children }) => <strong style={{ color: onSurface }}>{children}</strong>,
+        em: ({ children }) => <em style={{ color: onVariant }}>{children}</em>,
+        code: ({ children }) => <code className="rounded px-1 font-mono text-xs" style={{ background: "rgba(0,0,0,0.08)", color: onSurface }}>{children}</code>,
+        hr: () => <hr className="my-3 border-t" style={{ borderColor: "rgba(127,127,127,0.2)" }} />,
+        table: ({ children }) => (
+          <div className="overflow-x-auto my-3 rounded-lg border" style={{ borderColor: "rgba(127,127,127,0.2)" }}>
+            <table className="w-full text-sm border-collapse">{children}</table>
+          </div>
+        ),
+        thead: ({ children }) => <thead style={{ background: "rgba(127,127,127,0.08)" }}>{children}</thead>,
+        tr: ({ children }) => <tr className="border-t" style={{ borderColor: "rgba(127,127,127,0.15)" }}>{children}</tr>,
+        th: ({ children }) => <th className="px-3 py-2 text-left font-semibold text-xs" style={{ color: onSurface }}>{children}</th>,
+        td: ({ children }) => <td className="px-3 py-2 text-xs" style={{ color: onSurface }}>{children}</td>,
+        blockquote: ({ children }) => <blockquote className="border-l-2 pl-3 my-2 italic" style={{ borderColor: "rgba(127,127,127,0.4)", color: onVariant }}>{children}</blockquote>,
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  );
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -161,24 +177,20 @@ export default function AsistenteTab() {
   const [loading, setLoading]         = useState(false);
   const [statusLabel, setStatusLabel] = useState("Pensando…");
   const [sessionReady, setReady]      = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const bottomRef                     = useRef<HTMLDivElement>(null);
   const textareaRef                   = useRef<HTMLTextAreaElement>(null);
   const { getToken }                  = useAuth();
+  const { user }                      = useUser();
   const { resolvedTheme }             = useTheme();
-  const [mounted, setMounted]         = useState(false);
-  useEffect(() => setMounted(true), []);
 
-  const isDark = mounted && resolvedTheme === "dark";
 
-  // ── Tokens ──────────────────────────────────────────────────────────────────
-  const primaryColor  = isDark ? "oklch(0.72 0.16 38)" : "#F27405";
-  const surfaceLow    = isDark ? "#191c1e" : "#f3f3f7";
-  const surfaceLowest = isDark ? "#0b0d0f" : "#ffffff";
-  const onSurface     = isDark ? "#e2e0dd" : "#191c1e";
-  const onVariant     = isDark ? "#d3bcaf" : "#6b7280";
-  const shadowCard    = isDark
-    ? "0 12px 32px -4px rgba(0,0,0,0.28)"
-    : "0 12px 32px -4px rgba(25,28,30,0.06)";
+  const primaryColor  = "var(--primary)";
+  const surfaceLow    = "var(--surface-container-low)";
+  const surfaceLowest = "var(--surface-container-lowest)";
+  const onSurface     = "var(--on-surface)";
+  const onVariant     = "var(--on-surface-variant)";
+  const shadowCard    = "var(--shadow-ambient)";
 
   useEffect(() => {
     createAdkSession(SESSION_ID).then(() => setReady(true));
@@ -196,6 +208,7 @@ export default function AsistenteTab() {
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", text: t, refs: [] }]);
     setLoading(true);
     setStatusLabel("Pensando…");
+    setStreamingText("");
 
     try {
       const token = await getToken();
@@ -207,6 +220,7 @@ export default function AsistenteTab() {
         },
         body: JSON.stringify({ message: t, session_id: SESSION_ID }),
       });
+
 
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
@@ -225,7 +239,10 @@ export default function AsistenteTab() {
           const evt = JSON.parse(line.slice(6));
           if (evt.type === "tool") {
             setStatusLabel(evt.label);
+          } else if (evt.type === "token") {
+            setStreamingText((prev) => prev + evt.text);
           } else if (evt.type === "done") {
+            setStreamingText("");
             const reply = parseAgentResponse({ session_id: evt.session_id, response: evt.response });
             setMessages((prev) => [...prev, {
               id: crypto.randomUUID(), role: "agent",
@@ -234,9 +251,6 @@ export default function AsistenteTab() {
               planificacion: reply.planificacion,
               secuencia: reply.secuencia,
             }]);
-            setLoading(false);
-          } else if (evt.type === "error") {
-            setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "error", text: "Error al contactar el agente.", refs: [] }]);
             setLoading(false);
           }
         }
@@ -269,106 +283,106 @@ export default function AsistenteTab() {
       <div
         className="flex items-center justify-between px-6 py-4 flex-shrink-0"
         style={{
-          background: isDark ? "rgba(16,18,19,0.80)" : "rgba(255,255,255,0.80)",
+          background: "var(--glass-bg)",
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
-          boxShadow: isDark
-            ? "0 1px 0 rgba(255,255,255,0.04)"
-            : "0 1px 0 rgba(25,28,30,0.06)",
+          boxShadow: "0 1px 0 var(--border-subtle)",
         }}
       >
         <div className="flex items-center gap-3">
-          {/* Sparkle icon con el naranja nuevo */}
-          <div
-            className="w-9 h-9 rounded-2xl flex items-center justify-center"
-            style={{ background: isDark ? "rgba(200,100,50,0.16)" : "rgba(242,116,5,0.10)", color: primaryColor }}
-          >
-            <SparkleIcon />
-          </div>
-          <div>
-            <p
-              className="text-sm font-bold"
-              style={{ fontFamily: "var(--font-display)", color: onSurface, letterSpacing: "-0.01em" }}
-            >
-              Planificador IA
-            </p>
-            <p className="text-xs flex items-center gap-1.5" style={{ color: onVariant, fontFamily: "var(--font-body)" }}>
-              <span
-                className="w-1.5 h-1.5 rounded-full inline-block"
-                style={{ background: sessionReady ? "#16a34a" : "#d97706" }}
-              />
-              {sessionReady ? "Listo para ayudarte" : "Conectando…"}
-            </p>
-          </div>
+       
         </div>
-        <button
-          onClick={reset}
-          aria-label="Nueva sesión"
-          className="rounded-xl transition-all active:scale-95"
-          style={{
-            padding: "0.5rem",
-            color: onVariant,
-            background: "transparent",
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = isDark ? "rgba(255,255,255,0.06)" : "rgba(25,28,30,0.05)"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
-        >
-          <ResetIcon />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={reset}
+            aria-label="Nueva sesión"
+            className="rounded-xl transition-all active:scale-95 p-2 text-muted-foreground hover:bg-muted"
+          >
+            <ResetIcon />
+          </button>
+        </div>
       </div>
 
-      {/* ── Messages ────────────────────────────────────────────────────── */}
+      {/* ── Messages / Welcome ────────────────────────────────────────── */}
       <div
-        className="flex-1 overflow-y-auto min-h-0"
-        style={{ padding: "1.5rem 1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}
+        className="flex-1 overflow-y-auto w-full min-h-0 flex flex-col items-center"
+        style={{ padding: "1.5rem 1.25rem", gap: "1rem" }}
       >
-        {messages.length === 0 && (
-          <WelcomeScreen
-            sessionReady={sessionReady}
-            onSend={send}
-            isDark={isDark}
-            primaryColor={primaryColor}
-            surfaceLowest={surfaceLowest}
-            onSurface={onSurface}
-            onVariant={onVariant}
-            shadowCard={shadowCard}
-          />
+        <AnimatePresence mode="wait">
+          {messages.length === 0 ? (
+            <motion.div
+              key="welcome"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5 }}
+              className="flex-1 flex flex-col items-center justify-center w-full"
+            >
+              <WelcomeScreen
+                sessionReady={sessionReady}
+                onSend={send}
+                primaryColor={primaryColor}
+                surfaceLowest={surfaceLowest}
+                onSurface={onSurface}
+                onVariant={onVariant}
+                shadowCard={shadowCard}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="chat"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="w-full max-w-4xl flex flex-col gap-4"
+            >
+              {messages.map((msg) => (
+                <Bubble
+                  key={msg.id}
+                  message={msg}
+                  onOptionClick={send}
+                  primaryColor={primaryColor}
+                  surfaceLow={surfaceLow}
+                  onSurface={onSurface}
+                  onVariant={onVariant}
+                  shadowCard={shadowCard}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        {loading && !streamingText && <TypingIndicator label={statusLabel} surfaceLow={surfaceLow} onVariant={onVariant} />}
+        {streamingText && (
+          <div className="w-full max-w-4xl flex justify-start px-2">
+            <div
+              className="max-w-[85%] rounded-2xl rounded-tl-md px-4 py-3 text-sm leading-relaxed"
+              style={{ background: surfaceLow, color: onSurface, fontFamily: "var(--font-body)" }}
+            >
+              <MarkdownContent text={stripTokens(streamingText)} onSurface={onSurface} onVariant={onVariant} />
+              <span
+                className="inline-block w-2 h-4 ml-0.5 rounded-sm animate-pulse"
+                style={{ background: primaryColor, verticalAlign: "text-bottom", opacity: 0.8 }}
+              />
+            </div>
+          </div>
         )}
-
-        {messages.map((msg) => (
-          <Bubble
-            key={msg.id}
-            message={msg}
-            onOptionClick={send}
-            isDark={isDark}
-            primaryColor={primaryColor}
-            surfaceLow={surfaceLow}
-            onSurface={onSurface}
-            onVariant={onVariant}
-            shadowCard={shadowCard}
-          />
-        ))}
-        {loading && <TypingIndicator label={statusLabel} isDark={isDark} surfaceLow={surfaceLow} onVariant={onVariant} />}
         <div ref={bottomRef} />
       </div>
 
       {/* ── Input ───────────────────────────────────────────────────────── */}
-      <div
-        className="flex-shrink-0 px-4 pb-4 pt-3"
-        style={{
-          background: isDark ? "rgba(16,18,19,0.80)" : "rgba(255,255,255,0.80)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          boxShadow: isDark
-            ? "0 -1px 0 rgba(255,255,255,0.04)"
-            : "0 -1px 0 rgba(25,28,30,0.06)",
-        }}
+      <motion.div
+        layout
+        className="flex-shrink-0 w-full px-4 pb-6 pt-2 flex flex-col items-center"
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
-        <div
-          className="flex items-end gap-2 rounded-2xl p-1.5"
+        <motion.div
+          layout
+          className="flex flex-col gap-2 rounded-[32px] p-2 transition-all duration-300 group focus-within:ring-1 focus-within:ring-accent/20"
           style={{
-            background: surfaceLowest,
-            boxShadow: shadowCard,
+            background: "var(--input-bg)",
+            boxShadow: "var(--shadow-ambient)",
+            width: "100%",
+            maxWidth: messages.length === 0 ? "768px" : "100%",
           }}
         >
           <textarea
@@ -378,185 +392,146 @@ export default function AsistenteTab() {
             onKeyDown={onKey}
             disabled={loading || !sessionReady}
             rows={1}
-            placeholder={sessionReady ? "Escribí tu consulta…" : "Conectando con el agente…"}
-            className="flex-1 resize-none focus:outline-none disabled:opacity-60"
+            placeholder={sessionReady ? "Preguntarle al Facilitador Docente…" : "Conectando…"}
+            className="w-full resize-none focus:outline-none disabled:opacity-60 px-4 pt-3 pb-1"
             style={{
               background: "transparent",
               border: "none",
-              padding: "0.625rem 0.75rem",
-              fontSize: "0.875rem",
+              fontSize: "1rem",
               lineHeight: "1.5",
               color: onSurface,
               fontFamily: "var(--font-body)",
-              maxHeight: "140px",
+              maxHeight: "200px",
               overflowY: "auto",
             }}
           />
-          <button
-            onClick={() => send(input)}
-            disabled={loading || !sessionReady || !input.trim()}
-            aria-label="Enviar"
-            className="rounded-xl transition-all active:scale-90 disabled:opacity-40 flex-shrink-0"
-            style={{
-              background: input.trim() ? primaryColor : (isDark ? "rgba(255,255,255,0.08)" : "rgba(25,28,30,0.06)"),
-              color: input.trim() ? "#ffffff" : onVariant,
-              padding: "0.625rem",
-              border: "none",
-              cursor: input.trim() ? "pointer" : "not-allowed",
-              transition: "all 0.18s ease",
-              marginBottom: "0.125rem",
-            }}
-          >
-            <SendIcon />
-          </button>
-        </div>
-        <p
-          className="hidden md:block text-xs mt-2 ml-1"
-          style={{ color: onVariant, opacity: 0.6, fontFamily: "var(--font-body)" }}
-        >
-          Shift+Enter para nueva línea · Agente con acceso al programa EBI
-        </p>
-      </div>
+          <div className="flex items-center justify-between px-2 pb-1">
+            <div className="flex items-center gap-1">
+              <Button 
+                isIconOnly
+                variant="ghost"
+                isDisabled
+                size="sm"
+                className="opacity-30 cursor-not-allowed text-muted-foreground"
+              >
+                <Plus size={20} />
+              </Button>
+              <Button 
+                isIconOnly
+                variant="ghost"
+                isDisabled
+                size="sm"
+                className="opacity-30 cursor-not-allowed text-muted-foreground"
+              >
+                <Hammer size={18} />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button 
+                isIconOnly
+                variant="ghost"
+                isDisabled
+                size="sm"
+                className="opacity-30 cursor-not-allowed text-muted-foreground"
+              >
+                <Mic size={20} />
+              </Button>
+
+              <button
+                onClick={() => send(input)}
+                disabled={loading || !sessionReady || !input.trim()}
+                className="p-2.5 rounded-full transition-all active:scale-90 disabled:opacity-20 bg-accent text-white"
+                style={{
+                  background: input.trim() ? primaryColor : "transparent",
+                  color: input.trim() ? "#fff" : onVariant,
+                }}
+              >
+                <SendHorizontal size={20} />
+              </button>
+            </div>
+          </div>
+
+        </motion.div>
+
+        
+        <AnimatePresence>
+          {messages.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 5 }}
+              className="flex flex-wrap justify-center gap-2 mt-8"
+            >
+              {QUICK_PROMPTS.map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => send(q.label)}
+                  disabled={!sessionReady}
+                  className="flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all active:scale-95 text-xs font-medium"
+                  style={{ 
+                    color: "var(--on-surface-variant)",
+                    background: "transparent",
+                    borderColor: "rgba(120, 120, 120, 0.15)"
+                  }}
+                >
+                  <span style={{ color: "var(--primary)", opacity: 0.6 }}>{q.icon}</span>
+                  {q.label}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
     </div>
   );
 }
+
 
 // ── Welcome screen ────────────────────────────────────────────────────────────
 
-function WelcomeScreen({
-  sessionReady, onSend, isDark, primaryColor, surfaceLowest,
+const WelcomeScreen = memo(({
+  sessionReady, onSend, primaryColor, surfaceLowest,
   onSurface, onVariant, shadowCard,
 }: {
   sessionReady: boolean; onSend: (t: string) => void;
-  isDark: boolean; primaryColor: string; surfaceLowest: string;
+  primaryColor: string; surfaceLowest: string;
   onSurface: string; onVariant: string; shadowCard: string;
-}) {
+}) => {
+
+  const { user } = useUser();
+  
   return (
-    <div className="flex flex-col items-center justify-center flex-1 gap-8 py-8 px-2">
-
-      {/* Icon + heading */}
-      <div className="flex flex-col items-center gap-4 text-center">
-        <div
-          className="w-16 h-16 rounded-3xl flex items-center justify-center"
-          style={{
-            background: isDark ? "rgba(200,100,50,0.16)" : "rgba(242,116,5,0.10)",
-            color: primaryColor,
-            boxShadow: shadowCard,
-          }}
+    <div className="flex flex-col items-center justify-center flex-1 gap-4 py-8 px-2">
+      <div className="flex flex-col items-center gap-2 text-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
+        <h2
+          className="text-4xl md:text-5xl font-medium tracking-tight mb-2"
+          style={{ fontFamily: "var(--font-display)", color: "var(--on-surface)" }}
         >
-          <SparkleIcon size={32} />
-        </div>
-        <div>
-          <h2
-            className="text-xl font-black"
-            style={{ fontFamily: "var(--font-display)", color: onSurface, letterSpacing: "-0.02em" }}
-          >
-            ¿En qué te ayudo hoy?
-          </h2>
-          <p
-            className="text-sm mt-1 max-w-sm"
-            style={{ fontFamily: "var(--font-body)", color: onVariant, lineHeight: 1.6 }}
-          >
-            Estoy acá para que pases menos horas planificando y más tiempo con tus alumnos.
-          </p>
-        </div>
-      </div>
-
-      {/* Suggestion chips */}
-      <div className="w-full max-w-xl flex flex-col gap-2.5">
-        {/* Featured CTA */}
-        <button
-          onClick={() => onSend(QUICK_PROMPTS[0].label)}
-          disabled={!sessionReady}
-          className="w-full text-left rounded-2xl transition-all active:scale-[0.99] disabled:opacity-50"
-          style={{
-            background: primaryColor,
-            padding: "1rem 1.25rem",
-            border: "none",
-            cursor: "pointer",
-            boxShadow: isDark
-              ? "0 8px 24px rgba(200,100,50,0.28)"
-              : "0 8px 24px rgba(242,116,5,0.22)",
-          }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = "brightness(1.08)"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = "none"; }}
+          Hola, <span style={{ color: "var(--primary)" }}>{user?.firstName || "Colega"}</span>
+        </h2>
+        <h3
+          className="text-3xl md:text-4xl font-light tracking-tight opacity-30"
+          style={{ fontFamily: "var(--font-display)", color: "var(--on-surface)" }}
         >
-          <div className="flex items-center gap-3">
-            <span className="flex-shrink-0 opacity-90">{QUICK_PROMPTS[0].icon}</span>
-            <div>
-              <p
-                className="text-sm font-bold text-white"
-                style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.01em" }}
-              >
-                {QUICK_PROMPTS[0].label}
-              </p>
-              <p className="text-xs text-white/70 mt-0.5" style={{ fontFamily: "var(--font-body)" }}>
-                {QUICK_PROMPTS[0].subtext}
-              </p>
-            </div>
-          </div>
-        </button>
-
-        {/* Regular chips — 2 columns */}
-        <div className="grid grid-cols-2 gap-2.5">
-          {QUICK_PROMPTS.slice(1).map((q) => (
-            <button
-              key={q.label}
-              onClick={() => onSend(q.label)}
-              disabled={!sessionReady}
-              className="text-left rounded-2xl transition-all active:scale-[0.99] disabled:opacity-50"
-              style={{
-                background: surfaceLowest,
-                padding: "0.875rem 1rem",
-                border: "none",
-                cursor: "pointer",
-                boxShadow: shadowCard,
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = isDark
-                  ? "0 12px 32px -4px rgba(0,0,0,0.40)"
-                  : "0 12px 32px -4px rgba(25,28,30,0.12)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = shadowCard;
-              }}
-            >
-              <div className="flex items-start gap-2.5">
-                <div style={{ color: onVariant, flexShrink: 0, marginTop: "1px" }}>{q.icon}</div>
-                <div>
-                  <p
-                    className="text-xs font-semibold leading-snug"
-                    style={{ fontFamily: "var(--font-display)", color: onSurface, letterSpacing: "-0.01em" }}
-                  >
-                    {q.label}
-                  </p>
-                  <p
-                    className="text-xs mt-0.5"
-                    style={{ fontFamily: "var(--font-body)", color: onVariant, opacity: 0.8 }}
-                  >
-                    {q.subtext}
-                  </p>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
+          ¿Por dónde empezamos?
+        </h3>
       </div>
     </div>
   );
-}
+});
+
 
 // ── Bubble ────────────────────────────────────────────────────────────────────
 
-function Bubble({
-  message, onOptionClick, isDark, primaryColor, surfaceLow, onSurface, onVariant, shadowCard,
+const Bubble = memo(({
+  message, onOptionClick, primaryColor, surfaceLow, onSurface, onVariant, shadowCard,
 }: {
   message: Message; onOptionClick: (t: string) => void;
-  isDark: boolean; primaryColor: string; surfaceLow: string;
+  primaryColor: string; surfaceLow: string;
   onSurface: string; onVariant: string; shadowCard: string;
-}) {
+}) => {
+
   const isUser  = message.role === "user";
   const isError = message.role === "error";
   const [copied, setCopied] = useState(false);
@@ -576,7 +551,7 @@ function Bubble({
       <div className={`max-w-[85%] flex flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}>
 
         {!isUser && message.curriculum_match && (
-          <CurriculumMatchCard data={message.curriculum_match} isDark={isDark} onSurface={onSurface} onVariant={onVariant} primaryColor={primaryColor} />
+          <CurriculumMatchCard data={message.curriculum_match} onSurface={onSurface} onVariant={onVariant} primaryColor={primaryColor} />
         )}
         {!isUser && message.planificacion && (
           <PlanificacionTabla data={message.planificacion} />
@@ -605,14 +580,14 @@ function Bubble({
             className={`rounded-2xl rounded-bl-sm ${isError ? "border border-red-400/30" : ""}`}
             style={{
               background: isError
-                ? (isDark ? "rgba(220,38,38,0.08)" : "rgba(220,38,38,0.05)")
+                ? "var(--error-bg)"
                 : surfaceLow,
               padding: "0.875rem 1rem",
               boxShadow: isError ? "none" : shadowCard,
               color: isError ? "#dc2626" : onSurface,
             }}
           >
-            <div className="space-y-1">{renderMarkdown(bodyText)}</div>
+            <MarkdownContent text={bodyText} onSurface={onSurface} onVariant={onVariant} />
           </div>
         )}
 
@@ -671,7 +646,6 @@ function Bubble({
           <MultiSelect
             options={multiOptions}
             onConfirm={onOptionClick}
-            isDark={isDark}
             primaryColor={primaryColor}
             surfaceLow={surfaceLow}
             onSurface={onSurface}
@@ -691,8 +665,8 @@ function Bubble({
                 className="inline-flex items-center gap-1.5 rounded-xl transition-opacity hover:opacity-80"
                 style={{
                   padding: "0.25rem 0.75rem",
-                  background: isDark ? "rgba(18,74,240,0.16)" : "rgba(18,74,240,0.08)",
-                  color: isDark ? "#bdceff" : "#124af0",
+                  background: "rgba(18,74,240,0.08)",
+                  color: "#124af0",
                   fontSize: "0.72rem",
                   fontWeight: 600,
                   fontFamily: "var(--font-body)",
@@ -708,20 +682,20 @@ function Bubble({
       </div>
     </div>
   );
-}
+});
+
 
 // ── CurriculumMatchCard ───────────────────────────────────────────────────────
 
 function CurriculumMatchCard({
-  data, isDark, onSurface, onVariant, primaryColor,
+  data, onSurface, onVariant, primaryColor,
 }: {
-  data: CurriculumMatch; isDark: boolean;
+  data: CurriculumMatch;
   onSurface: string; onVariant: string; primaryColor: string;
 }) {
-  const surfaceLow = isDark ? "#191c1e" : "#f3f3f7";
-  const shadow = isDark
-    ? "0 12px 32px -4px rgba(0,0,0,0.28)"
-    : "0 12px 32px -4px rgba(25,28,30,0.06)";
+  const surfaceLow = "var(--surface-container-low)";
+  const shadow     = "var(--shadow-ambient)";
+
 
   return (
     <div
@@ -740,7 +714,7 @@ function CurriculumMatchCard({
         <MatchField label="Tramo" value={`Tramo ${data.tramo}`} onSurface={onSurface} onVariant={onVariant} />
         <MatchField label="Grado" value={`${data.grado} grado`} onSurface={onSurface} onVariant={onVariant} />
       </div>
-      <div className="space-y-2.5 pt-3" style={{ borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(25,28,30,0.06)"}` }}>
+      <div className="space-y-2.5 pt-3" style={{ borderTop: `1px solid var(--border-subtle)` }}>
         <MatchField label="Contenido" value={data.contenido} onSurface={onSurface} onVariant={onVariant} />
         <div>
           <p className="text-xs font-medium mb-0.5" style={{ color: onVariant, fontFamily: "var(--font-body)" }}>{data.ce_codigo}</p>
@@ -756,7 +730,7 @@ function CurriculumMatchCard({
               className="rounded-full text-xs font-semibold"
               style={{
                 padding: "0.2rem 0.6rem",
-                background: isDark ? "rgba(200,100,50,0.16)" : "rgba(242,116,5,0.10)",
+                background: "var(--brand-subtle)",
                 color: primaryColor,
                 fontFamily: "var(--font-display)",
               }}
@@ -766,7 +740,7 @@ function CurriculumMatchCard({
           ))}
         </div>
       )}
-      <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "rgba(25,28,30,0.06)"}` }}>
+      <div className="mt-3 pt-3" style={{ borderTop: `1px solid var(--border-subtle)` }}>
         <p className="text-xs font-semibold" style={{ color: onSurface, fontFamily: "var(--font-display)" }}>{data.metodo_ensenanza}</p>
         <p className="text-xs mt-0.5 leading-relaxed" style={{ color: onVariant, fontFamily: "var(--font-body)" }}>{data.metodo_justificacion}</p>
       </div>
@@ -958,10 +932,10 @@ function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
 // ── MultiSelect ───────────────────────────────────────────────────────────────
 
 function MultiSelect({
-  options, onConfirm, isDark, primaryColor, surfaceLow, onSurface, shadowCard,
+  options, onConfirm, primaryColor, surfaceLow, onSurface, shadowCard,
 }: {
   options: string[]; onConfirm: (t: string) => void;
-  isDark: boolean; primaryColor: string; surfaceLow: string;
+  primaryColor: string; surfaceLow: string;
   onSurface: string; shadowCard: string;
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -985,7 +959,7 @@ function MultiSelect({
               fontWeight: 600,
               fontFamily: "var(--font-display)",
               background: selected.has(opt)
-                ? (isDark ? "rgba(200,100,50,0.20)" : "rgba(242,116,5,0.10)")
+                ? "var(--brand-subtle)"
                 : surfaceLow,
               color: selected.has(opt) ? primaryColor : onSurface,
               border: "none",
@@ -1020,30 +994,102 @@ function MultiSelect({
   );
 }
 
-// ── Typing indicator ──────────────────────────────────────────────────────────
+// ── Honeycomb Loader (Dynamic Hash-based) ──────────────────────────────────
 
-function TypingIndicator({ label, isDark, surfaceLow, onVariant }: { label: string; isDark: boolean; surfaceLow: string; onVariant: string }) {
-  const shadow = isDark ? "0 12px 32px -4px rgba(0,0,0,0.28)" : "0 12px 32px -4px rgba(25,28,30,0.06)";
+function HoneycombLoader({ label }: { label: string }) {
+  // Deterministic hash function
+  const getHash = (str: string) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash);
+  };
+
+  const hash = getHash(label);
+  
+  // Rule: "Pensando..." is ALWAYS brand orange
+  const isThinking = label.toLowerCase().includes("pensando");
+  
+  // Calculate dynamic color: 
+  // If thinking, use brand orange.
+  // Otherwise, generate a "tint" of the brand orange (Hue around 28)
+  const hue = isThinking ? 28 : (20 + (hash % 25)); // Stay between 20 and 45 (Orange/Amber)
+  const saturation = isThinking ? 96 : (70 + (hash % 25));
+  const lightness = isThinking ? 48 : (50 + (hash % 15));
+  const dynamicColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  
+  // Available patterns
+  const patterns = ["wave", "spiral", "pulse", "zigzag", "random", "alternate"];
+  const pattern = isThinking ? "random" : patterns[hash % patterns.length];
+
+
+  // Hexagon grid positions (3-1-3) - Compact
+  const hexes = [
+    { x: 0,  y: 0,  i: 0 }, { x: 8.5, y: 0,  i: 1 }, { x: 17, y: 0,  i: 2 },
+    { x: 8.5, y: 7,  i: 3 },
+    { x: 0,  y: 14, i: 4 }, { x: 8.5, y: 14, i: 5 }, { x: 17, y: 14, i: 6 }
+  ];
+
+  const getDelay = (idx: number) => {
+    if (pattern === "wave")      return idx * 0.08;
+    if (pattern === "pulse")     return 0;
+    if (pattern === "spiral")    { const s = [0, 1, 2, 6, 5, 4, 3]; return s.indexOf(idx) * 0.08; }
+    if (pattern === "zigzag")    { const z = [0, 4, 1, 3, 5, 2, 6]; return z.indexOf(idx) * 0.08; }
+    if (pattern === "alternate") return idx % 2 === 0 ? 0 : 0.3;
+    return (hash + idx) % 7 * 0.1; // "random" based on hash
+  };
+
+  return (
+    <div className="flex items-center">
+      <svg width="24" height="22" viewBox="0 0 25 22" fill="none" className="flex-shrink-0">
+        <AnimatePresence>
+          {hexes.map((h, i) => (
+            <motion.path
+              key={`${label}-${i}`} // Force re-mount on label change for fresh animation
+              d={`M${h.x + 4} ${h.y}L${h.x + 7.46} ${h.y + 2}V${h.y + 6}L${h.x + 4} ${h.y + 8}L${h.x + 0.54} ${h.y + 6}V${h.y + 2}L${h.x + 4} ${h.y}Z`}
+              fill={dynamicColor}
+              initial={{ opacity: 0.1, scale: 0.5 }}
+              animate={{ 
+                opacity: [0.1, 1, 0.1],
+                scale: [0.8, 1.2, 0.8],
+              }}
+              transition={{
+                duration: 0.7,
+                repeat: Infinity,
+                delay: getDelay(i),
+                ease: "circOut"
+              }}
+            />
+          ))}
+        </AnimatePresence>
+      </svg>
+    </div>
+  );
+}
+
+
+
+function TypingIndicator({ label, surfaceLow, onVariant }: { label: string; surfaceLow: string; onVariant: string }) {
+  const shadow = "var(--shadow-ambient)";
   return (
     <div className="flex justify-start">
       <div
-        className="rounded-2xl rounded-bl-sm flex items-center gap-2.5"
-        style={{ background: surfaceLow, padding: "0.75rem 1rem", boxShadow: shadow }}
+        className="rounded-2xl rounded-bl-sm flex items-center gap-3"
+        style={{ 
+          background: surfaceLow, 
+          padding: "0.75rem 1.25rem", 
+          boxShadow: shadow,
+          border: "1px solid rgba(127,127,127,0.1)"
+        }}
       >
-        <div className="flex items-center gap-1">
-          {[0, 150, 300].map((delay, i) => (
-            <span
-              key={i}
-              className="w-1.5 h-1.5 rounded-full animate-bounce"
-              style={{ background: onVariant, animationDelay: `${delay}ms` }}
-            />
-          ))}
-        </div>
-        <span style={{ fontSize: "0.75rem", color: onVariant, fontFamily: "var(--font-body)" }}>{label}</span>
+        <HoneycombLoader label={label} />
+        <span style={{ fontSize: "0.75rem", fontWeight: 600, color: onVariant, fontFamily: "var(--font-body)" }}>{label}</span>
       </div>
     </div>
   );
 }
+
 
 // ── ExportBtn helper ──────────────────────────────────────────────────────────
 

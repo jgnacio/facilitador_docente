@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 
-const API_URL = process.env.API_URL ?? "http://localhost:8000";
+const API_URL = process.env.API_URL ?? "http://localhost:8001";
 
 // ── Helper: headers con JWT Clerk ─────────────────────────────────────────────
 

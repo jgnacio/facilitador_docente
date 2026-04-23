@@ -1,59 +1,77 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Button, Card, Chip, Spinner } from "@heroui/react";
-import { getCurriculumEstructura, type CurriculumEstructura } from "../../api-actions";
+import { Chip, Spinner } from "@heroui/react";
+import { getCurriculumEstructura } from "../../api-actions";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type CE = { codigo: string; texto: string; mcn: string[] };
-type ContenidoItem = {
-  eje: string;
-  contenido_estructurante: string;
-  especificos: string[];
-  competencias_relacionadas: string[];
-};
-type GradoContenidos = { label: string; items: ContenidoItem[] };
-type GradoCriterios = { label: string; por_competencia: Record<string, string[]> };
 type Materia = {
   nombre: string;
   competencias_especificas: CE[];
-  contenidos: Record<string, GradoContenidos>;
-  criterios: Record<string, GradoCriterios>;
+  contenidos: Record<string, string[]>;
+  criterios: Record<string, string[]>;
 };
-type Espacio = { nombre: string; materias: Record<string, Materia> };
-type Tramo = { label: string; espacios: Record<string, Espacio> };
-
-type ActiveTab = "ces" | "contenidos" | "criterios";
-
-const GRADE_LABELS: Record<string, string> = {
-  "3er_grado": "3.er grado",
-  "4to_grado": "4.to grado",
-  "5to_grado": "5.to grado",
-  "6to_grado": "6.to grado",
+type FlatEntry = {
+  tramoKey: string;
+  tramoLabel: string;
+  espacioNombre: string;
+  materiaKey: string;
+  materia: Materia;
 };
 
-const TRAMO_GRADES: Record<string, string[]> = {
-  tramo_3: ["3er_grado", "4to_grado"],
-  tramo_4: ["5to_grado", "6to_grado"],
-};
+// ─── Grade config ─────────────────────────────────────────────────────────────
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+const GRADES: { key: string; label: string }[] = [
+  { key: "nivel_3_anios", label: "Nivel 3 años" },
+  { key: "nivel_4_anios", label: "Nivel 4 años" },
+  { key: "nivel_5_anios", label: "Nivel 5 años" },
+  { key: "1er_grado",     label: "1.er grado" },
+  { key: "2do_grado",     label: "2.do grado" },
+  { key: "3er_grado",     label: "3.er grado" },
+  { key: "4to_grado",     label: "4.to grado" },
+  { key: "5to_grado",     label: "5.to grado" },
+  { key: "6to_grado",     label: "6.to grado" },
+];
+const GRADE_LABEL = Object.fromEntries(GRADES.map((g) => [g.key, g.label]));
 
-function SelectorButton({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
+// ─── Build flat index ─────────────────────────────────────────────────────────
+
+function buildIndex(tramos: Record<string, any>): FlatEntry[] {
+  const out: FlatEntry[] = [];
+  for (const [tramoKey, tramo] of Object.entries(tramos)) {
+    for (const [, espacio] of Object.entries(tramo.espacios ?? {})) {
+      for (const [materiaKey, materia] of Object.entries((espacio as any).materias ?? {})) {
+        out.push({
+          tramoKey,
+          tramoLabel: tramo.label,
+          espacioNombre: (espacio as any).nombre,
+          materiaKey,
+          materia: materia as Materia,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+function entryId(e: FlatEntry) { return `${e.tramoKey}/${e.materiaKey}`; }
+
+function snip(text: string, q: string): string {
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  const start = Math.max(0, i - 15);
+  return (start > 0 ? "…" : "") + text.slice(start, start + 90) + (start + 90 < text.length ? "…" : "");
+}
+
+// ─── Micro-components ─────────────────────────────────────────────────────────
+
+function Pill({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
     <button
       onClick={onPress}
       className={[
-        "px-3 py-1.5 rounded-lg text-sm font-medium transition-all border",
+        "px-3 py-1.5 rounded-lg text-sm font-medium transition-all border whitespace-nowrap",
         active
           ? "bg-accent/10 text-accent border-accent/30"
           : "text-muted-foreground border-border hover:bg-muted hover:text-foreground",
@@ -64,23 +82,13 @@ function SelectorButton({
   );
 }
 
-function TabButton({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
+function TabBtn({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
     <button
       onClick={onPress}
       className={[
         "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
-        active
-          ? "border-accent text-accent"
-          : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
+        active ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground",
       ].join(" ")}
     >
       {label}
@@ -88,122 +96,38 @@ function TabButton({
   );
 }
 
-// ── CE Accordion ──────────────────────────────────────────────────────────────
-
 function CEAccordion({ ces }: { ces: CE[] }) {
-  const [openCodes, setOpenCodes] = useState<Set<string>>(new Set());
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (code: string) =>
+    setOpen((p) => { const n = new Set(p); n.has(code) ? n.delete(code) : n.add(code); return n; });
 
-  const toggle = (code: string) => {
-    setOpenCodes((prev) => {
-      const next = new Set(prev);
-      if (next.has(code)) next.delete(code);
-      else next.add(code);
-      return next;
-    });
-  };
-
-  if (ces.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground py-4">
-        No hay competencias específicas registradas para esta materia.
-      </p>
-    );
-  }
+  if (!ces?.length)
+    return <p className="text-sm text-muted-foreground py-4">No hay competencias registradas.</p>;
 
   return (
     <div className="space-y-2">
-      {ces.map((ce) => {
-        const isOpen = openCodes.has(ce.codigo);
-        const preview = ce.texto.slice(0, 80) + (ce.texto.length > 80 ? "…" : "");
-        return (
-          <div key={ce.codigo} className="border border-border rounded-xl overflow-hidden">
-            <button
-              onClick={() => toggle(ce.codigo)}
-              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
-            >
-              <Chip size="sm" className="bg-accent/10 text-accent flex-shrink-0">
-                {ce.codigo}
-              </Chip>
-              <span className="text-sm text-foreground flex-1 min-w-0">
-                {preview}
-              </span>
-              <svg
-                className={[
-                  "w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform",
-                  isOpen ? "rotate-180" : "",
-                ].join(" ")}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {isOpen && (
-              <div className="px-4 pb-4 space-y-3 bg-muted/20">
-                <p className="text-sm text-foreground leading-relaxed pt-2">{ce.texto}</p>
-                {ce.mcn.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {ce.mcn.map((m) => (
-                      <Chip key={m} size="sm" className="bg-success/10 text-success text-xs">
-                        {m}
-                      </Chip>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Contenidos panel ──────────────────────────────────────────────────────────
-
-function ContenidosPanel({
-  gradoData,
-}: {
-  gradoData: GradoContenidos | undefined;
-}) {
-  if (!gradoData) {
-    return (
-      <p className="text-sm text-muted-foreground py-4">
-        No hay contenidos registrados para este grado.
-      </p>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {gradoData.items.map((item, idx) => (
-        <div key={idx} className="border border-border rounded-xl p-4 space-y-2">
-          {item.eje && (
-            <p className="text-xs font-semibold uppercase tracking-wide text-accent">
-              {item.eje}
-            </p>
-          )}
-          <p className="text-sm font-semibold text-foreground">
-            {item.contenido_estructurante}
-          </p>
-          {item.especificos.length > 0 && (
-            <ul className="list-disc list-inside space-y-0.5 pl-1">
-              {item.especificos.map((esp, i) => (
-                <li key={i} className="text-sm text-muted-foreground leading-relaxed">
-                  {esp}
-                </li>
-              ))}
-            </ul>
-          )}
-          {item.competencias_relacionadas.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {item.competencias_relacionadas.map((ce) => (
-                <Chip key={ce} size="sm" className="bg-accent/10 text-accent">
-                  {ce}
-                </Chip>
-              ))}
+      {ces.map((ce) => (
+        <div key={ce.codigo} className="border border-border rounded-xl overflow-hidden">
+          <button
+            onClick={() => toggle(ce.codigo)}
+            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
+          >
+            <Chip size="sm" className="bg-accent/10 text-accent flex-shrink-0">{ce.codigo}</Chip>
+            <span className="text-sm text-foreground flex-1 min-w-0 line-clamp-1">
+              {ce.texto}
+            </span>
+            <svg className={["w-4 h-4 flex-shrink-0 transition-transform text-muted-foreground", open.has(ce.codigo) ? "rotate-180" : ""].join(" ")} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {open.has(ce.codigo) && (
+            <div className="px-4 pb-4 bg-muted/20 space-y-3">
+              <p className="text-sm text-foreground leading-relaxed pt-2">{ce.texto}</p>
+              {ce.mcn?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {ce.mcn.map((m) => <Chip key={m} size="sm" className="bg-success/10 text-success text-xs">{m}</Chip>)}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -212,330 +136,286 @@ function ContenidosPanel({
   );
 }
 
-// ── Criterios panel ───────────────────────────────────────────────────────────
-
-function CriteriosPanel({
-  gradoData,
-  ces,
-}: {
-  gradoData: GradoCriterios | undefined;
-  ces: CE[];
-}) {
-  if (!gradoData) {
-    return (
-      <p className="text-sm text-muted-foreground py-4">
-        No hay criterios registrados para este grado.
-      </p>
-    );
-  }
-
-  const ceMap = Object.fromEntries(ces.map((c) => [c.codigo, c.texto]));
-
+function StringList({ items, emptyMsg }: { items: string[]; emptyMsg: string }) {
+  if (!items?.length) return <p className="text-sm text-muted-foreground py-4">{emptyMsg}</p>;
   return (
-    <div className="space-y-4">
-      {Object.entries(gradoData.por_competencia).map(([ceCode, criterios]) => {
-        const ceTexto = ceMap[ceCode] ?? "";
-        return (
-          <div key={ceCode} className="border border-border rounded-xl p-4 space-y-2">
-            <div className="flex items-start gap-2">
-              <Chip size="sm" className="bg-accent/10 text-accent flex-shrink-0 mt-0.5">
-                {ceCode}
-              </Chip>
-              {ceTexto && (
-                <p className="text-sm font-medium text-foreground leading-snug">{ceTexto}</p>
-              )}
-            </div>
-            <ol className="list-decimal list-inside space-y-1 pl-1">
-              {criterios.map((crit, i) => (
-                <li key={i} className="text-sm text-muted-foreground leading-relaxed">
-                  {crit}
-                </li>
-              ))}
-            </ol>
-          </div>
-        );
-      })}
-    </div>
+    <ul className="space-y-2">
+      {items.map((item, i) => (
+        <li key={i} className="border border-border rounded-lg px-4 py-3 text-sm text-foreground leading-relaxed">{item}</li>
+      ))}
+    </ul>
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ─── Main ────────────────────────────────────────────────────────────────────
 
 export default function ProgramaTab() {
-  const [curriculum, setCurriculum] = useState<CurriculumEstructura | null>(null);
+  const [rawTramos, setRawTramos] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
-  const [selectedTramo, setSelectedTramo] = useState<string>("tramo_3");
-  const [selectedEspacio, setSelectedEspacio] = useState<string | null>(null);
-  const [selectedMateria, setSelectedMateria] = useState<string | null>(null);
-  const [selectedGrado, setSelectedGrado] = useState<string>("3er_grado");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("ces");
+  const [query, setQuery] = useState("");
+  const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"ces" | "contenidos" | "criterios">("ces");
 
   useEffect(() => {
     getCurriculumEstructura()
-      .then((data) => {
-        if (Object.keys(data.tramos).length === 0) {
-          setError(true);
-        } else {
-          setCurriculum(data);
-        }
+      .then((d) => {
+        if (!d?.tramos || !Object.keys(d.tramos).length) setLoadError(true);
+        else setRawTramos(d.tramos as any);
         setLoading(false);
       })
-      .catch(() => {
-        setError(true);
-        setLoading(false);
-      });
+      .catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
-  // Reset downstream selections when tramo changes
-  const handleTramoChange = (tramo: string) => {
-    setSelectedTramo(tramo);
-    setSelectedEspacio(null);
-    setSelectedMateria(null);
-    setSelectedGrado(TRAMO_GRADES[tramo][0]);
-  };
+  const entries = useMemo<FlatEntry[]>(() => rawTramos ? buildIndex(rawTramos) : [], [rawTramos]);
 
-  // Reset materia when espacio changes
-  const handleEspacioChange = (espacio: string) => {
-    setSelectedEspacio(espacio);
-    setSelectedMateria(null);
-  };
+  // Grades that actually have data
+  const availableGrades = useMemo(() => {
+    const found = new Set<string>();
+    for (const e of entries) for (const k of Object.keys(e.materia.contenidos ?? {})) found.add(k);
+    return GRADES.filter((g) => found.has(g.key));
+  }, [entries]);
 
-  const tramos = useMemo<Record<string, Tramo>>(
-    () => (curriculum?.tramos ?? {}) as Record<string, Tramo>,
-    [curriculum]
+  // Unidades curriculares for selected grade
+  const materiasForGrade = useMemo<FlatEntry[]>(
+    () => selectedGrade ? entries.filter((e) => selectedGrade in (e.materia.contenidos ?? {})) : [],
+    [entries, selectedGrade]
   );
 
-  const espacios = useMemo<Record<string, Espacio>>(() => {
-    if (!curriculum || !selectedTramo) return {};
-    return (tramos[selectedTramo]?.espacios ?? {}) as Record<string, Espacio>;
-  }, [curriculum, selectedTramo, tramos]);
+  const currentEntry = useMemo<FlatEntry | null>(
+    () => entries.find((e) => entryId(e) === selectedId) ?? null,
+    [entries, selectedId]
+  );
 
-  const materias = useMemo<Record<string, Materia>>(() => {
-    if (!selectedEspacio) return {};
-    return (espacios[selectedEspacio]?.materias ?? {}) as Record<string, Materia>;
-  }, [espacios, selectedEspacio]);
+  // Grades the current materia has (for inline switcher)
+  const materiaGrades = useMemo(() => {
+    if (!currentEntry) return [];
+    return GRADES.filter((g) => g.key in (currentEntry.materia.contenidos ?? {}));
+  }, [currentEntry]);
 
-  const currentMateria = useMemo<Materia | null>(() => {
-    if (!selectedMateria) return null;
-    return materias[selectedMateria] ?? null;
-  }, [materias, selectedMateria]);
+  // Active grade for content — default to selectedGrade if valid
+  const [contentGrade, setContentGrade] = useState<string | null>(null);
+  const effectiveGrade = contentGrade ?? selectedGrade ?? materiaGrades[0]?.key ?? null;
 
-  const gradeKeys = TRAMO_GRADES[selectedTramo] ?? [];
+  // ── Search ────────────────────────────────────────────────────────────────
 
-  if (loading) {
+  type SResult = { entry: FlatEntry; gradeKey: string; snip: string };
+  const searchResults = useMemo<SResult[]>(() => {
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const results: SResult[] = [];
+    const seen = new Set<string>();
+
+    for (const entry of entries) {
+      const add = (gk: string, s: string) => {
+        const k = `${entryId(entry)}/${gk}`;
+        if (seen.has(k)) return;
+        seen.add(k);
+        results.push({ entry, gradeKey: gk, snip: s });
+      };
+
+      const firstGrade = Object.keys(entry.materia.contenidos ?? {})[0] ?? "";
+
+      if (entry.materia.nombre.toLowerCase().includes(q)) {
+        add(firstGrade, `Unidad curricular: ${entry.materia.nombre}`);
+        continue;
+      }
+      for (const ce of entry.materia.competencias_especificas ?? []) {
+        if (ce.texto?.toLowerCase().includes(q) || ce.codigo?.toLowerCase() === q) {
+          add(firstGrade, `CE ${ce.codigo}: ${snip(ce.texto ?? "", q)}`);
+          break;
+        }
+      }
+      for (const [gk, items] of Object.entries(entry.materia.contenidos ?? {})) {
+        for (const c of items) {
+          if (c.toLowerCase().includes(q)) { add(gk, snip(c, q)); break; }
+        }
+      }
+      for (const [gk, items] of Object.entries(entry.materia.criterios ?? {})) {
+        for (const c of items) {
+          if (c.toLowerCase().includes(q)) { add(gk, `Criterio: ${snip(c, q)}`); break; }
+        }
+      }
+    }
+    return results.slice(0, 10);
+  }, [query, entries]);
+
+  const openFromSearch = (r: SResult) => {
+    setSelectedGrade(r.gradeKey);
+    setSelectedId(entryId(r.entry));
+    setContentGrade(r.gradeKey);
+    setQuery("");
+    setActiveTab("ces");
+  };
+
+  const pickGrade = (g: string) => {
+    setSelectedGrade(g);
+    setSelectedId(null);
+    setContentGrade(g);
+  };
+
+  const pickMateria = (e: FlatEntry) => {
+    setSelectedId(entryId(e));
+    setContentGrade(selectedGrade);
+    setActiveTab("ces");
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  if (loading)
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
         <Spinner color="accent" size="lg" />
-        <p className="text-sm text-muted-foreground">Cargando programa curricular…</p>
+        <p className="text-sm text-muted-foreground">Cargando programa…</p>
       </div>
     );
-  }
 
-  if (error) {
+  if (loadError)
     return (
-      <div className="p-6 max-w-5xl w-full mx-auto">
-        <Card variant="transparent" className="border border-dashed border-danger/40 p-10 flex flex-col items-center gap-4 text-center">
-          <p className="text-sm text-danger">No se pudo cargar el programa curricular.</p>
-          <Button
-            variant="danger"
-            size="sm"
-            onPress={() => {
-              setError(false);
-              setLoading(true);
-              getCurriculumEstructura()
-                .then((data) => {
-                  setCurriculum(data);
-                  setLoading(false);
-                })
-                .catch(() => {
-                  setError(true);
-                  setLoading(false);
-                });
-            }}
-          >
-            Reintentar
-          </Button>
-        </Card>
+      <div className="p-6 max-w-3xl mx-auto border border-dashed border-danger/40 rounded-xl p-10 text-center">
+        <p className="text-sm text-danger">No se pudo cargar el programa curricular.</p>
       </div>
     );
-  }
+
+  const searching = query.trim().length >= 2;
+  const items = effectiveGrade
+    ? (activeTab === "contenidos"
+        ? currentEntry?.materia.contenidos[effectiveGrade] ?? []
+        : currentEntry?.materia.criterios[effectiveGrade] ?? [])
+    : [];
 
   return (
-    <div className="p-6 max-w-5xl w-full mx-auto space-y-6">
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
+    <div className="p-6 max-w-3xl w-full mx-auto space-y-5">
+      {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-foreground">Explorador del Programa EBI</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Navegá la estructura curricular: tramos, espacios, materias, contenidos y criterios de logro.
-        </p>
+        <h2 className="text-xl font-bold text-foreground">Programa EBI</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">Buscá o seleccioná tu grado y unidad curricular.</p>
       </div>
 
-      {/* ── Tramo selector ──────────────────────────────────────────────────── */}
-      <Card variant="default" className="rounded-xl">
-        <Card.Content className="p-4 space-y-4">
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Tramo
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(tramos).map(([key, tramo]) => (
-                <SelectorButton
-                  key={key}
-                  label={tramo.label}
-                  active={selectedTramo === key}
-                  onPress={() => handleTramoChange(key)}
-                />
-              ))}
-            </div>
-          </div>
+      {/* Search */}
+      <div className="relative">
+        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+          <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35" />
+          </svg>
+        </div>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscá un contenido, CE, criterio o unidad curricular…"
+          className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition-all"
+        />
+        {query && (
+          <button onClick={() => setQuery("")} className="absolute inset-y-0 right-3 flex items-center text-xl text-muted-foreground hover:text-foreground leading-none">×</button>
+        )}
+      </div>
 
-          {/* ── Espacio selector ──────────────────────────────────────────── */}
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Espacio curricular
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(espacios).map(([key, espacio]) => (
-                <SelectorButton
-                  key={key}
-                  label={espacio.nombre}
-                  active={selectedEspacio === key}
-                  onPress={() => handleEspacioChange(key)}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* ── Materia selector ──────────────────────────────────────────── */}
-          {selectedEspacio && Object.keys(materias).length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Materia
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(materias).map(([key, materia]) => (
-                  <SelectorButton
-                    key={key}
-                    label={materia.nombre}
-                    active={selectedMateria === key}
-                    onPress={() => setSelectedMateria(key)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ── Grado selector ────────────────────────────────────────────── */}
-          {selectedMateria && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Grado
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {gradeKeys.map((gKey) => (
-                  <SelectorButton
-                    key={gKey}
-                    label={GRADE_LABELS[gKey] ?? gKey}
-                    active={selectedGrado === gKey}
-                    onPress={() => setSelectedGrado(gKey)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </Card.Content>
-      </Card>
-
-      {/* ── Content area ────────────────────────────────────────────────────── */}
-      {currentMateria ? (
-        <Card variant="default" className="rounded-xl">
-          <Card.Content className="p-0">
-            {/* Tab header */}
-            <div className="flex border-b border-border px-4">
-              <TabButton
-                label="Competencias Específicas"
-                active={activeTab === "ces"}
-                onPress={() => setActiveTab("ces")}
-              />
-              <TabButton
-                label="Contenidos"
-                active={activeTab === "contenidos"}
-                onPress={() => setActiveTab("contenidos")}
-              />
-              <TabButton
-                label="Criterios de Logro"
-                active={activeTab === "criterios"}
-                onPress={() => setActiveTab("criterios")}
-              />
-            </div>
-
-            {/* Tab body */}
-            <div className="p-4">
-              {/* Materia title */}
-              <div className="mb-4">
-                <h3 className="text-base font-bold text-foreground">
-                  {currentMateria.nombre}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {tramos[selectedTramo]?.label} ·{" "}
-                  {selectedEspacio ? espacios[selectedEspacio]?.nombre : ""}
-                  {activeTab !== "ces" && (
-                    <span className="ml-1">
-                      · {GRADE_LABELS[selectedGrado] ?? selectedGrado}
-                    </span>
-                  )}
-                </p>
-              </div>
-
-              {activeTab === "ces" && (
-                <CEAccordion ces={currentMateria.competencias_especificas} />
-              )}
-
-              {activeTab === "contenidos" && (
-                <ContenidosPanel
-                  gradoData={currentMateria.contenidos[selectedGrado]}
-                />
-              )}
-
-              {activeTab === "criterios" && (
-                <CriteriosPanel
-                  gradoData={currentMateria.criterios[selectedGrado]}
-                  ces={currentMateria.competencias_especificas}
-                />
-              )}
-            </div>
-          </Card.Content>
-        </Card>
+      {/* Search results */}
+      {searching ? (
+        <div className="space-y-2">
+          {!searchResults.length
+            ? <p className="text-sm text-muted-foreground px-1">Sin resultados para "{query}".</p>
+            : searchResults.map((r, i) => (
+              <button key={i} onClick={() => openFromSearch(r)}
+                className="w-full text-left border border-border rounded-xl px-4 py-3 hover:bg-muted/40 hover:border-accent/30 transition-all"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold text-foreground">{r.entry.materia.nombre}</span>
+                  <Chip size="sm" className="bg-accent/10 text-accent">{GRADE_LABEL[r.gradeKey] ?? r.gradeKey}</Chip>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{r.entry.tramoLabel}</p>
+                <p className="text-xs text-foreground/60 mt-1 line-clamp-1">{r.snip}</p>
+              </button>
+            ))
+          }
+        </div>
       ) : (
-        <Card variant="transparent" className="border border-dashed border-border rounded-xl p-12 flex flex-col items-center gap-3 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent">
-            <BookIcon />
+        <>
+          {/* Grade selector */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Grado</p>
+            <div className="flex flex-wrap gap-2">
+              {availableGrades.map((g) => (
+                <Pill key={g.key} label={g.label} active={selectedGrade === g.key} onPress={() => pickGrade(g.key)} />
+              ))}
+            </div>
           </div>
-          <div>
-            <p className="font-semibold text-foreground text-sm">
-              {!selectedEspacio
-                ? "Seleccioná un espacio curricular para comenzar"
-                : !selectedMateria
-                ? "Seleccioná una materia para ver sus contenidos"
-                : "Seleccioná un grado para ver los contenidos"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Usá los selectores de arriba para navegar el programa.
-            </p>
+
+          {/* Unidad curricular selector */}
+          {selectedGrade && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unidad curricular</p>
+              <div className="flex flex-wrap gap-2">
+                {materiasForGrade.map((e) => (
+                  <Pill key={entryId(e)} label={e.materia.nombre} active={selectedId === entryId(e)} onPress={() => pickMateria(e)} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Content panel */}
+      {currentEntry ? (
+        <div className="border border-border rounded-xl overflow-hidden">
+          {/* Panel header */}
+          <div className="px-5 pt-4 pb-0">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h3 className="text-base font-bold text-foreground">{currentEntry.materia.nombre}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{currentEntry.tramoLabel} · {currentEntry.espacioNombre}</p>
+              </div>
+              {/* Inline grade switcher — only when contenidos/criterios and multiple grades */}
+              {activeTab !== "ces" && materiaGrades.length > 1 && (
+                <div className="flex gap-1.5 flex-wrap">
+                  {materiaGrades.map((g) => (
+                    <button
+                      key={g.key}
+                      onClick={() => setContentGrade(g.key)}
+                      className={[
+                        "px-2.5 py-1 rounded-lg text-xs font-medium border transition-all",
+                        effectiveGrade === g.key
+                          ? "bg-accent/10 text-accent border-accent/30"
+                          : "text-muted-foreground border-border hover:bg-muted",
+                      ].join(" ")}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        </Card>
+
+          {/* Tabs */}
+          <div className="flex border-b border-border px-5 mt-3">
+            <TabBtn label="Competencias" active={activeTab === "ces"} onPress={() => setActiveTab("ces")} />
+            <TabBtn label="Contenidos" active={activeTab === "contenidos"} onPress={() => setActiveTab("contenidos")} />
+            <TabBtn label="Criterios" active={activeTab === "criterios"} onPress={() => setActiveTab("criterios")} />
+          </div>
+
+          {/* Body */}
+          <div className="p-5">
+            {activeTab === "ces" && <CEAccordion ces={currentEntry.materia.competencias_especificas} />}
+            {activeTab === "contenidos" && <StringList items={items} emptyMsg="No hay contenidos para este grado." />}
+            {activeTab === "criterios" && <StringList items={items} emptyMsg="No hay criterios para este grado." />}
+          </div>
+        </div>
+      ) : !searching && (
+        <div className="border border-dashed border-border rounded-xl p-10 flex flex-col items-center gap-3 text-center">
+          <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+            </svg>
+          </div>
+          <p className="text-sm font-medium text-foreground">
+            {!selectedGrade ? "Seleccioná tu grado" : "Seleccioná una unidad curricular"}
+          </p>
+          <p className="text-xs text-muted-foreground">O usá el buscador para ir directo al contenido.</p>
+        </div>
       )}
     </div>
-  );
-}
-
-function BookIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-    </svg>
   );
 }

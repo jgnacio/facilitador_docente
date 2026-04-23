@@ -8,6 +8,8 @@
    ══════════════════════════════════════════════════════════════════════════════ */
 
 :root {
+  color-scheme: light dark;
+
   /* ── Primary (brand orange) ── */
   --primary:           #F27405;
   --primary-container: #F27405;
@@ -62,6 +64,12 @@
   --muted-foreground:   #6b7280;
   --border:             rgba(222, 193, 179, 0.40);
   --muted:              #f3f3f7;
+
+  /* ── App Shell Tokens ── */
+  --sidebar-bg:    rgba(255, 255, 255, 0.85);
+  --topbar-bg:     rgba(255, 255, 255, 0.80);
+  --active-nav-bg: rgba(156, 68, 0, 0.06);
+  --hover-bg:      rgba(242, 116, 5, 0.08);
 }
 
 /* ── Dark mode ─────────────────────────────────────────────────────────────── */
@@ -103,6 +111,12 @@
   --muted-foreground: #d3bcaf;
   --border:           rgba(87, 66, 56, 0.50);
   --muted:            #191c1e;
+
+  /* ── App Shell Tokens ── */
+  --sidebar-bg:    rgba(16, 18, 19, 0.88);
+  --topbar-bg:     rgba(10, 12, 14, 0.82);
+  --active-nav-bg: rgba(255, 182, 143, 0.10);
+  --hover-bg:      rgba(200, 100, 50, 0.12);
 }
 
 /* ── Base ───────────────────────────────────────────────────────────────────── */
@@ -110,13 +124,13 @@
 html, body {
   max-width: 100vw;
   overflow-x: hidden;
+  background: var(--surface);
+  color: var(--on-surface);
 }
 
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: var(--surface);
-  color: var(--on-surface);
   font-family: var(--font-body);
 }
 

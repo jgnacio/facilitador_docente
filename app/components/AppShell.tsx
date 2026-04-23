@@ -87,34 +87,18 @@ export default function AppShell() {
 
   // ── Design tokens ──────────────────────────────────────────────────────────
   // Glassmorphism sidebar (The "Glass & Gradient" Rule)
-  const sidebarBg = isDark
-    ? "rgba(16, 18, 19, 0.88)"
-    : "rgba(255, 255, 255, 0.85)";
+  const sidebarBg = "var(--sidebar-bg, rgba(255, 255, 255, 0.85))";
+  const topBarBg  = "var(--topbar-bg, rgba(255, 255, 255, 0.80))";
+  const mainBg    = "var(--surface)";
+  
+  const activeNavBg = "var(--active-nav-bg)";
+  const activeColor = "var(--primary)";
+  const inactiveText = "var(--on-surface-variant)";
+  const hoverBg      = "var(--hover-bg)";
+  const userNameColor = "var(--on-surface)";
+  const ctaGradient   = "var(--primary)";
+  const ctaShadow     = "var(--shadow-ambient)";
 
-  const topBarBg = isDark
-    ? "rgba(10, 12, 14, 0.82)"
-    : "rgba(255, 255, 255, 0.80)";
-
-  const mainBg = isDark ? "#101213" : "#f9f9fd";
-
-  // Surface-container-lowest for active nav
-  const activeNavBg = isDark
-    ? "rgba(255, 182, 143, 0.10)"
-    : "rgba(156, 68, 0, 0.06)";
-
-  const activeColor  = isDark ? "oklch(0.72 0.16 38)" : "#F27405";
-  const inactiveText = isDark ? "#d3bcaf" : "#574238";
-
-  const hoverBg = isDark
-    ? "rgba(200, 100, 50, 0.12)"
-    : "rgba(242, 116, 5, 0.08)";
-
-  const userNameColor = isDark ? "#e2e0dd" : "#191c1e";
-
-  const ctaGradient = isDark ? "oklch(0.72 0.16 38)" : "#F27405";
-  const ctaShadow   = isDark
-    ? "0 4px 20px rgba(200, 100, 50, 0.35)"
-    : "0 4px 20px rgba(242, 116, 5, 0.22)";
 
   return (
     <div style={{ background: mainBg, minHeight: "100vh" }}>
@@ -129,10 +113,9 @@ export default function AppShell() {
           WebkitBackdropFilter: "blur(12px)",
           padding: "1.75rem 1.25rem",
           // Ambient shadow instead of border
-          boxShadow: isDark
-            ? "4px 0 40px rgba(0, 0, 0, 0.20)"
-            : "4px 0 40px rgba(25, 28, 30, 0.06)",
+          boxShadow: "var(--shadow-ambient)",
         }}
+
       >
         {/* Logo */}
         <div className="flex items-center justify-center mb-10 px-3">
@@ -238,9 +221,7 @@ export default function AppShell() {
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
           // Tonal elevation — no hard border
-          boxShadow: isDark
-            ? "0 1px 0 rgba(255,255,255,0.04)"
-            : "0 1px 0 rgba(25,28,30,0.05)",
+          boxShadow: "var(--shadow-ambient)",
         }}
       >
         {/* Isotipo en mobile */}
@@ -264,9 +245,7 @@ export default function AppShell() {
           {/* Ghost border fallback: 15% opacity */}
           <div style={{
             width: "1px", height: "1.75rem",
-            background: isDark
-              ? "rgba(87,66,56,0.50)"
-              : "rgba(222,193,179,0.60)",
+            background: "var(--border)",
           }} />
 
           <div className="flex items-center gap-3">
@@ -319,9 +298,7 @@ export default function AppShell() {
           backdropFilter: "blur(12px)",
           WebkitBackdropFilter: "blur(12px)",
           // Tonal separation — no hard border
-          boxShadow: isDark
-            ? "0 -1px 0 rgba(255,255,255,0.05)"
-            : "0 -1px 0 rgba(25,28,30,0.06)",
+          boxShadow: "var(--shadow-ambient)",
           height: "72px",
           paddingBottom: "env(safe-area-inset-bottom)",
         }}
