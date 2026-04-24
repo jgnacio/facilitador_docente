@@ -12,6 +12,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
+const AGENT_BASE = process.env.NEXT_PUBLIC_AGENT_URL ?? API_BASE;
 
 type Role = "user" | "agent" | "error";
 
@@ -222,7 +223,7 @@ export default function AsistenteTab() {
 
     try {
       const token = await getToken();
-      const res = await fetch(`${API_BASE}/agente/chat/stream`, {
+      const res = await fetch(`${AGENT_BASE}/agente/chat/stream`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
