@@ -160,7 +160,7 @@ export default function PlanificacionesTab({ onGoToPlanificador }: { onGoToPlani
       ) : apiError ? (
         <Card variant="transparent" className="border border-dashed border-danger/40 p-10 flex flex-col items-center gap-4 text-center">
           <p className="text-sm text-danger">No se pudo conectar con la API.</p>
-          <Button variant="danger" size="sm" onPress={reload}>Reintentar</Button>
+          <Button variant="danger" size="sm" onPress={refresh}>Reintentar</Button>
         </Card>
       ) : plans.length === 0 ? (
         <Card variant="transparent" className="border border-dashed border-border p-12 flex flex-col items-center gap-4 text-center">
