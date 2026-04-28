@@ -19,7 +19,8 @@ type Role = "user" | "agent" | "error";
 type CurriculumMatch = {
   espacio: string; unidad: string; tramo: number; grado: string;
   contenido: string; ce_codigo: string; ce_texto: string;
-  competencias_mcn: string[]; criterio_de_logro: string;
+  criterio_de_logro: string; meta_aprendizaje: string;
+  competencias_mcn: string[];
   metodo_ensenanza: string; metodo_justificacion: string;
 };
 type PlanificacionMomento = {
@@ -567,13 +568,13 @@ const Bubble = memo(({
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[85%] flex flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}>
 
-        {!isUser && message.curriculum_match && (
+        {!isUser && message.curriculum_match?.espacio && (
           <CurriculumMatchCard data={message.curriculum_match} onSurface={onSurface} onVariant={onVariant} primaryColor={primaryColor} />
         )}
-        {!isUser && message.planificacion && (
+        {!isUser && message.planificacion?.momentos?.length > 0 && (
           <PlanificacionTabla data={message.planificacion} />
         )}
-        {!isUser && message.secuencia && (
+        {!isUser && message.secuencia?.actividades?.length > 0 && (
           <SecuenciaTablaInline data={message.secuencia} />
         )}
 
@@ -741,6 +742,12 @@ function CurriculumMatchCard({
           <p className="text-sm font-medium leading-relaxed" style={{ color: onSurface, fontFamily: "var(--font-body)" }}>{data.ce_texto}</p>
         </div>
         <MatchField label="Criterio de logro" value={data.criterio_de_logro} onSurface={onSurface} onVariant={onVariant} />
+        {data.meta_aprendizaje && (
+          <div className="pt-2 mt-1" style={{ borderTop: "1px solid var(--border-subtle)" }}>
+            <p className="text-xs font-medium mb-0.5" style={{ color: onVariant, fontFamily: "var(--font-body)" }}>Meta de Aprendizaje</p>
+            <p className="text-sm font-semibold leading-relaxed" style={{ color: onSurface, fontFamily: "var(--font-body)" }}>{data.meta_aprendizaje}</p>
+          </div>
+        )}
       </div>
       {data.competencias_mcn.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3">
