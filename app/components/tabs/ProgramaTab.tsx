@@ -123,7 +123,7 @@ function CEAccordion({ ces }: { ces: CE[] }) {
           {open.has(ce.codigo) && (
             <div className="px-4 pb-4 bg-muted/20 space-y-3">
               <p className="text-sm text-foreground leading-relaxed pt-2">{ce.texto}</p>
-              {ce.mcn?.length > 0 && (
+              {(ce.mcn?.length ?? 0) > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {ce.mcn.map((m) => <Chip key={m} size="sm" className="bg-success/10 text-success text-xs">{m}</Chip>)}
                 </div>

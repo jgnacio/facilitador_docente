@@ -568,13 +568,13 @@ const Bubble = memo(({
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[85%] flex flex-col gap-2 ${isUser ? "items-end" : "items-start"}`}>
 
-        {!isUser && message.curriculum_match?.espacio && (
+        {!isUser && message.curriculum_match && message.curriculum_match.espacio && (
           <CurriculumMatchCard data={message.curriculum_match} onSurface={onSurface} onVariant={onVariant} primaryColor={primaryColor} />
         )}
-        {!isUser && message.planificacion?.momentos?.length > 0 && (
+        {!isUser && message.planificacion && message.planificacion.momentos.length > 0 && (
           <PlanificacionTabla data={message.planificacion} />
         )}
-        {!isUser && message.secuencia?.actividades?.length > 0 && (
+        {!isUser && message.secuencia && message.secuencia.actividades.length > 0 && (
           <SecuenciaTablaInline data={message.secuencia} />
         )}
 
