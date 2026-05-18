@@ -112,7 +112,7 @@ export default function SequenceDetailPage() {
     const ctx = [
       `[ctx: group_id=${groupId}, project_id=${projectId}, sequence_id=${sequenceId}]`,
       `Secuencia: "${sequence?.name}". Proyecto: "${project?.name}". Grupo: ${group?.name} (${group?.stage}, nivel ${group?.level}).`,
-      sequence?.goal ? `Objetivo de la secuencia: ${sequence.goal}.` : "",
+      sequence?.learning_goal ? `Objetivo de la secuencia: ${sequence.learning_goal}.` : "",
       actList,
     ].filter(Boolean).join(" ");
     const label = `Secuencia: ${sequence?.name ?? "..."} · ${project?.name ?? "..."} · Grupo: ${group?.name ?? "..."}`;

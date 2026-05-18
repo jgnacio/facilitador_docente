@@ -119,8 +119,7 @@ export default function ProjectDetailPage() {
     const ctx = [
       `[ctx: group_id=${groupId}, project_id=${projectId}]`,
       `Proyecto integrador: "${project?.name}". Grupo: ${group?.name} (${group?.stage}, nivel ${group?.level}).`,
-      project?.description ? `Descripción: ${project.description}.` : "",
-      project?.objective ? `Objetivo: ${project.objective}.` : "",
+      project?.purpose ? `Propósito: ${project.purpose}.` : "",
     ].filter(Boolean).join(" ");
     const label = `Proyecto: ${project?.name ?? "..."} · Grupo: ${group?.name ?? "..."} · Nivel ${group?.level ?? ""}`;
     goToChat(ctx, label);

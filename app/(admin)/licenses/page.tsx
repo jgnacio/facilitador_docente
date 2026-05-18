@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   Chip,
   Input,
@@ -16,6 +16,7 @@ import {
   TableRow,
   TableCell,
 } from "@heroui/react";
+
 import { useAuth } from "@clerk/nextjs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, UserPlus, UserMinus, CheckCircle2, AlertCircle } from "lucide-react";
@@ -91,11 +92,11 @@ export default function LicensesPage() {
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <Card>
-          <CardBody>
+          <CardContent>
             <p style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}>
               No se encontró un ID de institución en tu cuenta.
             </p>
-          </CardBody>
+          </CardContent>
         </Card>
       </div>
     );
@@ -132,14 +133,14 @@ export default function LicensesPage() {
           { label: "Disponibles", value: available,  color: "var(--success)"            },
         ].map(({ label, value, color }) => (
           <Card key={label} style={{ boxShadow: "var(--shadow-ambient)" }}>
-            <CardBody className="text-center py-4">
+            <CardContent className="text-center py-4">
               <p className="text-3xl font-bold" style={{ fontFamily: "var(--font-display)", color }}>
                 {isPending ? "—" : value}
               </p>
               <p className="text-xs mt-1" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}>
                 {label}
               </p>
-            </CardBody>
+            </CardContent>
           </Card>
         ))}
       </div>
@@ -154,7 +155,7 @@ export default function LicensesPage() {
             Licencias
           </h2>
         </CardHeader>
-        <CardBody>
+        <CardContent>
           {isPending ? (
             <div className="flex justify-center py-12">
               <Spinner />
@@ -167,7 +168,7 @@ export default function LicensesPage() {
               No hay licencias registradas para esta institución.
             </p>
           ) : (
-            <Table aria-label="Tabla de licencias" removeWrapper>
+            <Table aria-label="Tabla de licencias">
               <TableHeader>
                 <TableColumn>ID</TableColumn>
                 <TableColumn>Estado</TableColumn>
@@ -189,7 +190,7 @@ export default function LicensesPage() {
                       <Chip
                         size="sm"
                         color={STATUS_COLOR[license.status]}
-                        variant="flat"
+                        variant="soft"
                       >
                         {STATUS_LABEL[license.status]}
                       </Chip>
@@ -213,23 +214,20 @@ export default function LicensesPage() {
                         {license.status === "available" && (
                           <>
                             <Input
-                              size="sm"
                               placeholder="user_id"
                               value={assignUserId[license.id] ?? ""}
-                              onValueChange={(val) =>
-                                setAssignUserId((prev) => ({ ...prev, [license.id]: val }))
+                              onChange={(e) =>
+                                setAssignUserId((prev) => ({ ...prev, [license.id]: e.target.value }))
                               }
                               className="w-48"
                             />
                             <Button
                               size="sm"
-                              color="primary"
-                              variant="flat"
-                              isLoading={loadingId === license.id}
-                              isDisabled={!assignUserId[license.id]?.trim()}
+                              variant="primary"
+                              isDisabled={loadingId === license.id || !assignUserId[license.id]?.trim()}
                               onPress={() => handleAssign(license.id)}
-                              startContent={<UserPlus size={14} />}
                             >
+                              {loadingId === license.id ? null : <UserPlus size={14} />}
                               Asignar
                             </Button>
                           </>
@@ -237,12 +235,11 @@ export default function LicensesPage() {
                         {license.status === "assigned" && (
                           <Button
                             size="sm"
-                            color="danger"
-                            variant="flat"
-                            isLoading={loadingId === license.id}
+                            variant="danger"
+                            isDisabled={loadingId === license.id}
                             onPress={() => handleRevoke(license.id)}
-                            startContent={<UserMinus size={14} />}
                           >
+                            {loadingId === license.id ? null : <UserMinus size={14} />}
                             Revocar
                           </Button>
                         )}
@@ -264,7 +261,7 @@ export default function LicensesPage() {
               </TableBody>
             </Table>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
     </div>
   );

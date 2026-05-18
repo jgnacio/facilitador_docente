@@ -4,10 +4,12 @@ import { useState } from "react";
 import {
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   Input,
+  Label,
   Spinner,
+  TextField,
 } from "@heroui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Plus, Pencil, Trash2, Check, X } from "lucide-react";
@@ -60,20 +62,15 @@ function CenterForm({
           {center ? "Editar centro" : "Nuevo centro educativo"}
         </h2>
       </CardHeader>
-      <CardBody className="flex flex-col gap-4">
-        <Input
-          label="Nombre del centro"
-          placeholder="Ej: Escuela N.° 42 Centenario"
-          value={name}
-          onValueChange={setName}
-          isRequired
-        />
-        <Input
-          label="Institution Tenant ID (opcional)"
-          placeholder="Ej: inst_abc123"
-          value={tenantId}
-          onValueChange={setTenantId}
-        />
+      <CardContent className="flex flex-col gap-4">
+        <TextField value={name} onChange={setName} isRequired>
+          <Label>Nombre del centro</Label>
+          <Input placeholder="Ej: Escuela N.° 42 Centenario" />
+        </TextField>
+        <TextField value={tenantId} onChange={setTenantId}>
+          <Label>Institution Tenant ID (opcional)</Label>
+          <Input placeholder="Ej: inst_abc123" />
+        </TextField>
         {error && (
           <p className="text-sm" style={{ color: "var(--destructive)", fontFamily: "var(--font-body)" }}>
             {error}
@@ -81,19 +78,19 @@ function CenterForm({
         )}
         <div className="flex gap-2">
           <Button
-            color="primary"
-            isLoading={saving}
-            isDisabled={!name.trim()}
+            variant="primary"
+            isDisabled={saving || !name.trim()}
             onPress={handleSave}
-            startContent={<Check size={16} />}
           >
+            {saving ? null : <Check size={16} />}
             Guardar
           </Button>
-          <Button variant="flat" onPress={onCancel} startContent={<X size={16} />}>
+          <Button variant="secondary" onPress={onCancel}>
+            <X size={16} />
             Cancelar
           </Button>
         </div>
-      </CardBody>
+      </CardContent>
     </Card>
   );
 }
@@ -168,10 +165,10 @@ export default function EducationalCentersPage() {
           </div>
         </div>
         <Button
-          color="primary"
+          variant="primary"
           onPress={() => setView("create")}
-          startContent={<Plus size={16} />}
         >
+          <Plus size={16} />
           Nuevo centro
         </Button>
       </div>
@@ -183,27 +180,26 @@ export default function EducationalCentersPage() {
         </div>
       ) : centers.length === 0 ? (
         <Card style={{ boxShadow: "var(--shadow-ambient)" }}>
-          <CardBody className="text-center py-12">
+          <CardContent className="text-center py-12">
             <Building2 size={40} className="mx-auto mb-3" style={{ color: "var(--outline)" }} />
             <p className="text-sm" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}>
               No tenés centros educativos registrados todavía.
             </p>
             <Button
               className="mt-4"
-              color="primary"
-              variant="flat"
+              variant="primary"
               onPress={() => setView("create")}
-              startContent={<Plus size={16} />}
             >
+              <Plus size={16} />
               Agregar el primero
             </Button>
-          </CardBody>
+          </CardContent>
         </Card>
       ) : (
         <div className="flex flex-col gap-3">
           {centers.map((center) => (
             <Card key={center.id} style={{ boxShadow: "var(--shadow-ambient)" }}>
-              <CardBody className="flex flex-row items-center justify-between gap-4">
+              <CardContent className="flex flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
@@ -231,7 +227,7 @@ export default function EducationalCentersPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <Button
                     size="sm"
-                    variant="flat"
+                    variant="secondary"
                     isIconOnly
                     aria-label="Editar"
                     onPress={() => setEditing(center)}
@@ -240,17 +236,16 @@ export default function EducationalCentersPage() {
                   </Button>
                   <Button
                     size="sm"
-                    color="danger"
-                    variant="flat"
+                    variant="danger"
                     isIconOnly
                     aria-label="Eliminar"
-                    isLoading={deletingId === center.id}
+                    isDisabled={deletingId === center.id}
                     onPress={() => handleDelete(center)}
                   >
                     <Trash2 size={15} />
                   </Button>
                 </div>
-              </CardBody>
+              </CardContent>
             </Card>
           ))}
         </div>

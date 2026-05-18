@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   Chip,
   Spinner,
@@ -102,7 +102,7 @@ export default function SubscriptionsPage() {
               Suscripción activa
             </h2>
           </CardHeader>
-          <CardBody>
+          <CardContent>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <div>
                 <p className="text-xs mb-1" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}>
@@ -116,7 +116,7 @@ export default function SubscriptionsPage() {
                 <p className="text-xs mb-1" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}>
                   Estado
                 </p>
-                <Chip size="sm" color={STATUS_COLOR[subscription.status] ?? "default"} variant="flat">
+                <Chip size="sm" color={STATUS_COLOR[subscription.status] ?? "default"} variant="soft">
                   {subscription.status}
                 </Chip>
               </div>
@@ -129,7 +129,7 @@ export default function SubscriptionsPage() {
                 </p>
               </div>
             </div>
-          </CardBody>
+          </CardContent>
         </Card>
       ) : (
         /* Plan list */
@@ -144,11 +144,11 @@ export default function SubscriptionsPage() {
             </div>
           ) : plans.length === 0 ? (
             <Card>
-              <CardBody>
+              <CardContent>
                 <p className="text-center text-sm" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}>
                   No hay planes disponibles en este momento.
                 </p>
-              </CardBody>
+              </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -172,7 +172,7 @@ export default function SubscriptionsPage() {
                       )}
                     </div>
                   </CardHeader>
-                  <CardBody className="flex flex-col gap-4">
+                  <CardContent className="flex flex-col gap-4">
                     <div>
                       <span
                         className="text-3xl font-bold"
@@ -185,15 +185,15 @@ export default function SubscriptionsPage() {
                       </span>
                     </div>
                     <Button
-                      color="primary"
+                      variant="primary"
                       fullWidth
-                      isLoading={checkingOut === plan.id}
+                      isDisabled={checkingOut === plan.id}
                       onPress={() => handleCheckout(plan)}
-                      endContent={<ExternalLink size={14} />}
                     >
+                      <ExternalLink size={14} />
                       Suscribirse
                     </Button>
-                  </CardBody>
+                  </CardContent>
                 </Card>
               ))}
             </div>

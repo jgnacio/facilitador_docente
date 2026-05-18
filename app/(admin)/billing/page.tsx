@@ -4,10 +4,11 @@ import { useState } from "react";
 import {
   Button,
   Card,
-  CardBody,
+  CardContent,
   CardHeader,
   Chip,
   Input,
+  Label,
   Spinner,
   Table,
   TableHeader,
@@ -15,6 +16,7 @@ import {
   TableColumn,
   TableRow,
   TableCell,
+  TextField,
 } from "@heroui/react";
 import { useAuth } from "@clerk/nextjs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -79,11 +81,11 @@ export default function BillingPage() {
     return (
       <div className="p-6 max-w-4xl mx-auto">
         <Card>
-          <CardBody>
+          <CardContent>
             <p style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}>
               No se encontró un ID de institución en tu cuenta.
             </p>
-          </CardBody>
+          </CardContent>
         </Card>
       </div>
     );
@@ -122,24 +124,19 @@ export default function BillingPage() {
             Generar ciclo de facturación
           </h2>
         </CardHeader>
-        <CardBody>
+        <CardContent>
           <div className="flex items-start gap-3 flex-wrap">
-            <Input
-              label="MP Plan ID"
-              placeholder="plan_xxxxxxxx"
-              value={mpPlanId}
-              onValueChange={setMpPlanId}
-              className="max-w-xs"
-            />
+            <TextField value={mpPlanId} onChange={setMpPlanId} className="max-w-xs">
+              <Label>MP Plan ID</Label>
+              <Input placeholder="plan_xxxxxxxx" />
+            </TextField>
             <div className="flex flex-col gap-2 mt-6">
               <Button
-                color="primary"
-                isLoading={generating}
-                isDisabled={!mpPlanId.trim()}
+                variant="primary"
+                isDisabled={generating || !mpPlanId.trim()}
                 onPress={handleGenerate}
-                startContent={<RefreshCw size={16} />}
               >
-                Generar ciclo
+                {generating ? "Generando..." : "Generar ciclo"}
               </Button>
             </div>
           </div>
@@ -148,7 +145,7 @@ export default function BillingPage() {
               {genError}
             </p>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
 
       {/* Cycles table */}
@@ -160,11 +157,12 @@ export default function BillingPage() {
           >
             Historial de ciclos
           </h2>
-          <Button size="sm" variant="flat" onPress={refresh} startContent={<RefreshCw size={14} />}>
+           <Button size="sm" variant="secondary" onPress={refresh}>
+            <RefreshCw size={14} />
             Actualizar
           </Button>
         </CardHeader>
-        <CardBody>
+        <CardContent>
           {isPending ? (
             <div className="flex justify-center py-12">
               <Spinner />
@@ -177,7 +175,7 @@ export default function BillingPage() {
               No hay ciclos de facturación registrados.
             </p>
           ) : (
-            <Table aria-label="Historial de facturación" removeWrapper>
+            <Table aria-label="Historial de facturación">
               <TableHeader>
                 <TableColumn>Período</TableColumn>
                 <TableColumn>Licencias</TableColumn>
@@ -207,7 +205,7 @@ export default function BillingPage() {
                       <Chip
                         size="sm"
                         color={STATUS_COLOR[cycle.status] ?? "default"}
-                        variant="flat"
+                        variant="soft"
                       >
                         {STATUS_LABEL[cycle.status] ?? cycle.status}
                       </Chip>
@@ -222,7 +220,7 @@ export default function BillingPage() {
               </TableBody>
             </Table>
           )}
-        </CardBody>
+        </CardContent>
       </Card>
     </div>
   );
