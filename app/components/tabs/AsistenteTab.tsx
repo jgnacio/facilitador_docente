@@ -183,15 +183,17 @@ function MarkdownContent({ text, onSurface, onVariant }: { text: string; onSurfa
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-export default function AsistenteTab() {
+export default function AsistenteTab({ contextMessage, contextLabel }: { contextMessage?: string; contextLabel?: string }) {
   const [messages, setMessages]       = useState<Message[]>([]);
   const [input, setInput]             = useState("");
   const [loading, setLoading]         = useState(false);
   const [statusLabel, setStatusLabel] = useState("Pensando…");
   const [sessionReady, setReady]      = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [showContext, setShowContext]  = useState(!!contextLabel);
   const bottomRef                     = useRef<HTMLDivElement>(null);
   const textareaRef                   = useRef<HTMLTextAreaElement>(null);
+  const contextUsed                   = useRef(false);
   const { getToken }                  = useAuth();
   const { user }                      = useUser();
   const { resolvedTheme }             = useTheme();
@@ -222,6 +224,13 @@ export default function AsistenteTab() {
     setStatusLabel("Pensando…");
     setStreamingText("");
 
+    // Prepend context to first message only — invisible in UI, visible al agente
+    let agentMessage = t;
+    if (contextMessage && !contextUsed.current) {
+      contextUsed.current = true;
+      agentMessage = `${contextMessage} ${t}`;
+    }
+
     try {
       const token = await getToken();
       const res = await fetch(`${AGENT_BASE}/agente/chat/stream`, {
@@ -230,7 +239,7 @@ export default function AsistenteTab() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ message: t, session_id: SESSION_ID }),
+        body: JSON.stringify({ message: agentMessage, session_id: SESSION_ID }),
       });
 
 
@@ -315,6 +324,37 @@ export default function AsistenteTab() {
           </button>
         </div>
       </div>
+
+      {/* ── Context Badge ────────────────────────────────────────────── */}
+      {showContext && contextLabel && (
+        <div
+          className="flex items-center justify-between px-4 py-2 flex-shrink-0"
+          style={{
+            background: "color-mix(in srgb, var(--primary) 10%, transparent)",
+            borderBottom: "1px solid color-mix(in srgb, var(--primary) 20%, transparent)",
+          }}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+            </svg>
+            <span
+              className="text-xs truncate"
+              style={{ color: "var(--primary)", fontFamily: "var(--font-dm-sans)", fontWeight: 600 }}
+            >
+              {contextLabel}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowContext(false)}
+            className="flex-shrink-0 ml-2 rounded-full p-0.5 transition-opacity hover:opacity-70"
+            style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", lineHeight: 1 }}
+            aria-label="Cerrar contexto"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      )}
 
       {/* ── Messages / Welcome ────────────────────────────────────────── */}
       <div

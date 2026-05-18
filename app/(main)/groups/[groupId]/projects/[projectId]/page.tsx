@@ -107,6 +107,25 @@ export default function ProjectDetailPage() {
     setSeqError(""); setSeqTouched(false);
   };
 
+  const goToChat = (ctx?: string, label?: string) => {
+    if (ctx && label) {
+      router.push(`/asistente?ctx=${encodeURIComponent(ctx)}&label=${encodeURIComponent(label)}`);
+    } else {
+      router.push("/asistente");
+    }
+  };
+
+  const handleCreateSequenceWithChat = () => {
+    const ctx = [
+      `[ctx: group_id=${groupId}, project_id=${projectId}]`,
+      `Proyecto integrador: "${project?.name}". Grupo: ${group?.name} (${group?.stage}, nivel ${group?.level}).`,
+      project?.description ? `Descripción: ${project.description}.` : "",
+      project?.objective ? `Objetivo: ${project.objective}.` : "",
+    ].filter(Boolean).join(" ");
+    const label = `Proyecto: ${project?.name ?? "..."} · Grupo: ${group?.name ?? "..."} · Nivel ${group?.level ?? ""}`;
+    goToChat(ctx, label);
+  };
+
   const resetActForm = () => {
     setShowActForm(false);
     setActTitle(""); setActContent("");
@@ -183,7 +202,7 @@ export default function ProjectDetailPage() {
                 Secuencias de actividades
               </h2>
               <button
-                onClick={() => setShowSeqForm(true)}
+                onClick={handleCreateSequenceWithChat}
                 className="flex items-center gap-1.5 transition-all active:scale-95"
                 style={{ background: "none", border: "1.5px solid var(--outline-variant)", color: onSurfaceVariant, borderRadius: "0.75rem", padding: "0.4rem 0.875rem", fontSize: "0.8rem", fontWeight: 600, fontFamily: "var(--font-dm-sans)", cursor: "pointer" }}
               >
@@ -242,7 +261,7 @@ export default function ProjectDetailPage() {
                 Actividades sueltas
               </h2>
               <button
-                onClick={() => setShowActForm(true)}
+                onClick={() => router.push("/asistente")}
                 className="flex items-center gap-1.5 transition-all active:scale-95"
                 style={{ background: "none", border: "1.5px solid var(--outline-variant)", color: onSurfaceVariant, borderRadius: "0.75rem", padding: "0.4rem 0.875rem", fontSize: "0.8rem", fontWeight: 600, fontFamily: "var(--font-dm-sans)", cursor: "pointer" }}
               >

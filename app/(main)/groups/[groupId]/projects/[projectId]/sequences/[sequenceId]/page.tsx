@@ -105,6 +105,20 @@ export default function SequenceDetailPage() {
     onError: () => setEditSeqError("Error al guardar."),
   });
 
+  const handleCreateActivityWithChat = () => {
+    const actList = sortedActivities.length > 0
+      ? `Actividades existentes en la secuencia: ${sortedActivities.map((a, i) => `${i + 1}. ${a.title}`).join(", ")}.`
+      : "La secuencia aún no tiene actividades.";
+    const ctx = [
+      `[ctx: group_id=${groupId}, project_id=${projectId}, sequence_id=${sequenceId}]`,
+      `Secuencia: "${sequence?.name}". Proyecto: "${project?.name}". Grupo: ${group?.name} (${group?.stage}, nivel ${group?.level}).`,
+      sequence?.goal ? `Objetivo de la secuencia: ${sequence.goal}.` : "",
+      actList,
+    ].filter(Boolean).join(" ");
+    const label = `Secuencia: ${sequence?.name ?? "..."} · ${project?.name ?? "..."} · Grupo: ${group?.name ?? "..."}`;
+    router.push(`/asistente?ctx=${encodeURIComponent(ctx)}&label=${encodeURIComponent(label)}`);
+  };
+
   const deleteSeqMutation = useMutation({
     mutationFn: () => deleteSequence(groupId, projectId, sequenceId),
     onSuccess: () => router.push(`/groups/${groupId}/projects/${projectId}`),
@@ -263,7 +277,7 @@ export default function SequenceDetailPage() {
             Actividades
           </h2>
           <button
-            onClick={() => setShowForm(true)}
+            onClick={handleCreateActivityWithChat}
             className="flex items-center gap-1.5 transition-all active:scale-95"
             style={{ background: "none", border: "1.5px solid var(--primary)", color: primaryColor, borderRadius: "0.75rem", padding: "0.4rem 0.875rem", fontSize: "0.8rem", fontWeight: 700, fontFamily: "var(--font-fraunces)", cursor: "pointer" }}
           >
