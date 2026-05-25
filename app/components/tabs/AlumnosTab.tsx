@@ -6,8 +6,11 @@ import {
   TextField, Label, Input, TextArea, FieldError,
   Select, ListBox,
 } from "@heroui/react";
-import { getAlumnos, getGroups, createAlumno, updateAlumno, deleteAlumno, type Alumno, type Group } from "../../api-actions";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  getAlumnos, getGroups, createAlumno, updateAlumno, deleteAlumno,
+  type Alumno, type Group,
+} from "../../api-actions";
 
 const NIVELES = ["Inicial", "Primaria", "Secundaria"];
 
@@ -50,6 +53,8 @@ export default function AlumnosTab() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["alumnos"] });
 
+  const [assigningAlumno, setAssigningAlumno] = useState<Alumno | null>(null);
+
   const filtered = alumnos.filter((a) =>
     a.nombre_completo.toLowerCase().includes(search.toLowerCase())
   );
@@ -61,6 +66,15 @@ export default function AlumnosTab() {
     await deleteAlumno(a.id);
     refresh();
   };
+
+  const assignMutation = useMutation({
+    mutationFn: ({ id, group_id }: { id: number; group_id: string | null }) =>
+      updateAlumno(id, { group_id }),
+    onSuccess: () => {
+      setAssigningAlumno(null);
+      refresh();
+    },
+  });
 
   if (view === "create") {
     return (
@@ -132,9 +146,22 @@ export default function AlumnosTab() {
               group={a.group_id ? groupMap[a.group_id] : undefined}
               onEdit={() => handleEdit(a)}
               onDelete={() => handleDelete(a)}
+              onAssign={() => setAssigningAlumno(a)}
             />
           ))}
         </div>
+      )}
+
+      {/* ── Assign to group modal ───────────────────────────────────────────── */}
+      {assigningAlumno && (
+        <GroupAssignModal
+          alumno={assigningAlumno}
+          groups={groups}
+          currentGroupId={assigningAlumno.group_id ?? null}
+          onClose={() => setAssigningAlumno(null)}
+          onAssign={(groupId) => assignMutation.mutate({ id: assigningAlumno.id, group_id: groupId })}
+          isPending={assignMutation.isPending}
+        />
       )}
     </div>
   );
@@ -142,11 +169,12 @@ export default function AlumnosTab() {
 
 // ── Alumno card ───────────────────────────────────────────────────────────────
 
-function AlumnoCard({ alumno, group, onEdit, onDelete }: {
+function AlumnoCard({ alumno, group, onEdit, onDelete, onAssign }: {
   alumno: Alumno;
   group?: Group;
   onEdit: () => void;
   onDelete: () => void;
+  onAssign: () => void;
 }) {
   const sub = [alumno.nivel, alumno.grado].filter(Boolean).join(" · ");
   return (
@@ -174,6 +202,14 @@ function AlumnoCard({ alumno, group, onEdit, onDelete }: {
         )}
       </div>
       <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          onClick={onAssign}
+          className={`p-1.5 rounded-lg transition-all ${group ? "text-accent hover:text-accent hover:bg-accent/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+          aria-label="Asignar a grupo"
+          title={group ? `Cambiar grupo (${group.name})` : "Asignar a grupo"}
+        >
+          <GroupIcon size={14} />
+        </button>
         <button
           onClick={onEdit}
           className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
@@ -354,6 +390,209 @@ function AlumnoForm({ alumno, groups, onBack, onSaved }: {
               ? <><Spinner size="sm" color="current" /> Guardando…</>
               : isEdit ? "Guardar cambios" : "Guardar Alumno"}
           </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Group Assign Modal ─────────────────────────────────────────────────────────
+
+function GroupAssignModal({ alumno, groups, currentGroupId, onClose, onAssign, isPending }: {
+  alumno: Alumno;
+  groups: Group[];
+  currentGroupId: string | null;
+  onClose: () => void;
+  onAssign: (groupId: string | null) => void;
+  isPending: boolean;
+}) {
+  const [selected, setSelected] = useState<string | null>(currentGroupId);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--surface)",
+          borderRadius: "1.5rem",
+          padding: "1.75rem",
+          maxWidth: "420px",
+          width: "90%",
+          maxHeight: "80vh",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          gap: "1rem",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+          border: "1px solid rgba(127,127,127,0.12)",
+        }}
+      >
+        {/* ── Header ── */}
+        <div>
+          <p style={{ fontWeight: 700, fontSize: "1rem", color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)", marginBottom: "0.25rem" }}>
+            Asignar a grupo
+          </p>
+          <p style={{ fontSize: "0.8rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)" }}>
+            {alumno.nombre_completo}
+            {alumno.nivel && ` · ${alumno.nivel}`}
+            {alumno.grado && ` · ${alumno.grado}`}
+          </p>
+        </div>
+
+        {/* ── Group list ── */}
+        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.375rem" }}>
+          {/* "Sin grupo" option (only if currently assigned) */}
+          {currentGroupId && (
+            <button
+              onClick={() => setSelected(null)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                padding: "0.75rem 1rem",
+                borderRadius: "1rem",
+                border: selected === null ? "2px solid var(--danger)" : "1.5px solid var(--outline-variant)",
+                background: selected === null ? "var(--danger)/8" : "transparent",
+                cursor: "pointer",
+                textAlign: "left",
+                transition: "all 0.15s",
+              }}
+            >
+              <div style={{
+                width: "32px", height: "32px", borderRadius: "0.75rem",
+                background: "var(--danger)/10", display: "flex", alignItems: "center",
+                justifyContent: "center", color: "var(--danger)", flexShrink: 0,
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </div>
+              <div>
+                <p style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--danger)", fontFamily: "var(--font-dm-sans)" }}>
+                  Quitar grupo
+                </p>
+                <p style={{ fontSize: "0.7rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)" }}>
+                  El alumno quedará sin grupo asignado
+                </p>
+              </div>
+            </button>
+          )}
+
+          {groups.length === 0 ? (
+            <p style={{ textAlign: "center", padding: "2rem 0", fontSize: "0.85rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)" }}>
+              No hay grupos disponibles. Creá grupos primero.
+            </p>
+          ) : (
+            groups.map((g) => {
+              const isSelected = selected === g.id;
+              return (
+                <button
+                  key={g.id}
+                  onClick={() => setSelected(g.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                    padding: "0.75rem 1rem",
+                    borderRadius: "1rem",
+                    border: isSelected ? "2px solid var(--primary)" : "1.5px solid var(--outline-variant)",
+                    background: isSelected ? "var(--primary-subtle)" : "transparent",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <div style={{
+                    width: "32px", height: "32px", borderRadius: "0.75rem",
+                    background: isSelected ? "var(--primary)" : "var(--primary-subtle)",
+                    display: "flex", alignItems: "center",
+                    justifyContent: "center", color: isSelected ? "#fff" : "var(--primary)",
+                    flexShrink: 0,
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
+                      {g.name}
+                    </p>
+                    {(g.stage || g.level) && (
+                      <p style={{ fontSize: "0.7rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)" }}>
+                        {[g.stage, g.level].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                  {isSelected && (
+                    <span style={{ marginLeft: "auto", color: "var(--primary)" }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* ── Actions ── */}
+        <div className="flex gap-3 pt-1">
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1,
+              padding: "0.625rem 1.25rem",
+              borderRadius: "0.875rem",
+              border: "1.5px solid var(--outline-variant)",
+              background: "transparent",
+              color: "var(--on-surface-variant)",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              fontFamily: "var(--font-dm-sans)",
+              cursor: "pointer",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => {
+              if (selected !== currentGroupId) {
+                onAssign(selected);
+              } else {
+                onClose();
+              }
+            }}
+            disabled={isPending}
+            className="flex items-center justify-center gap-2 transition-all active:scale-95"
+            style={{
+              flex: 1,
+              padding: "0.625rem 1.5rem",
+              borderRadius: "0.875rem",
+              border: "none",
+              background: "var(--primary)",
+              color: "#fff",
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              fontFamily: "var(--font-fraunces)",
+              cursor: "pointer",
+              opacity: isPending || selected === currentGroupId ? 0.6 : 1,
+            }}
+          >
+            {isPending ? (
+              <><Spinner size="sm" color="current" /> Asignando…</>
+            ) : selected === null ? (
+              "Quitar grupo"
+            ) : selected === currentGroupId ? (
+              "Sin cambios"
+            ) : (
+              "Asignar"
+            )}
+          </button>
         </div>
       </div>
     </div>
