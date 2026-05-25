@@ -156,7 +156,12 @@ export default function PlanificacionesTab({ onGoToPlanificador }: { onGoToPlani
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Spinner color="accent" /></div>
+        <div className="flex justify-center py-4">
+          <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{color: "var(--accent, #06b6d4)"}}>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
       ) : apiError ? (
         <Card variant="transparent" className="border border-dashed border-danger/40 p-10 flex flex-col items-center gap-4 text-center">
           <p className="text-sm text-danger">No se pudo conectar con la API.</p>

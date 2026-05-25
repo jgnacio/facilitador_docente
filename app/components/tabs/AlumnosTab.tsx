@@ -121,7 +121,12 @@ export default function AlumnosTab() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex justify-center py-16"><Spinner color="success" /></div>
+        <div className="flex justify-center py-4">
+          <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{color: "var(--success, #10b981)"}}>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
       ) : alumnos.length === 0 ? (
         <Card variant="transparent" className="border border-dashed border-border p-12 flex flex-col items-center gap-4 text-center">
           <div className="w-14 h-14 rounded-2xl bg-success/10 flex items-center justify-center text-success">

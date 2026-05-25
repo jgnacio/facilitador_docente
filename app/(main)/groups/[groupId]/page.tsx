@@ -4,12 +4,15 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Spinner } from "@heroui/react";
-import { ChevronRight, Folder, Plus, Users } from "lucide-react";
+import { ChevronRight, Folder, Plus, Users, Pencil, Trash2 } from "lucide-react";
 import {
   getGroup,
   getProjects,
   createProject,
+  updateProject,
+  deleteProject,
   getAlumnosByGroup,
+  type IntegrativeProject,
 } from "@/app/api-actions";
 import { ProjectCard } from "@/app/components/cards";
 
@@ -34,6 +37,8 @@ export default function GroupDetailPage() {
   const queryClient = useQueryClient();
 
   const [showForm, setShowForm] = useState(false);
+  const [editingProject, setEditingProject] = useState<IntegrativeProject | null>(null);
+  const [deletingProject, setDeletingProject] = useState<IntegrativeProject | null>(null);
   const [formName, setFormName] = useState("");
   const [formPurpose, setFormPurpose] = useState("");
   const [formDurationWeeks, setFormDurationWeeks] = useState("");
@@ -42,6 +47,8 @@ export default function GroupDetailPage() {
   const [formEndDate, setFormEndDate] = useState("");
   const [formError, setFormError] = useState("");
   const [touched, setTouched] = useState(false);
+
+  const isEditing = editingProject !== null;
 
   const { data: group, isPending: loadingGroup } = useQuery({
     queryKey: ["group", groupId],
@@ -76,8 +83,39 @@ export default function GroupDetailPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({
+      projectId,
+      data,
+    }: {
+      projectId: string;
+      data: Parameters<typeof updateProject>[2];
+    }) => updateProject(groupId, projectId, data),
+    onSuccess: (result) => {
+      if (!result) {
+        setFormError("No se pudo actualizar el proyecto.");
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ["projects", groupId] });
+      resetForm();
+    },
+    onError: () => {
+      setFormError("Error al actualizar el proyecto.");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (projectId: string) => deleteProject(groupId, projectId),
+    onSuccess: (ok) => {
+      if (!ok) return;
+      queryClient.invalidateQueries({ queryKey: ["projects", groupId] });
+      setDeletingProject(null);
+    },
+  });
+
   const resetForm = () => {
     setShowForm(false);
+    setEditingProject(null);
     setFormName("");
     setFormPurpose("");
     setFormDurationWeeks("");
@@ -88,18 +126,38 @@ export default function GroupDetailPage() {
     setTouched(false);
   };
 
+  const handleEditOpen = (project: IntegrativeProject) => {
+    setEditingProject(project);
+    setFormName(project.name);
+    setFormPurpose(project.purpose ?? "");
+    setFormDurationWeeks(project.duration_weeks?.toString() ?? "");
+    setFormFinalProduct(project.final_product ?? "");
+    setFormStartDate(project.start_date ?? "");
+    setFormEndDate(project.end_date ?? "");
+    setFormError("");
+    setTouched(false);
+    setShowForm(true);
+  };
+
   const handleSubmit = () => {
     setTouched(true);
     if (!formName.trim()) return;
     setFormError("");
-    createMutation.mutate({
+
+    const data = {
       name: formName.trim(),
       purpose: formPurpose.trim() || undefined,
       duration_weeks: formDurationWeeks ? Number(formDurationWeeks) : undefined,
       final_product: formFinalProduct.trim() || undefined,
       start_date: formStartDate || undefined,
       end_date: formEndDate || undefined,
-    });
+    };
+
+    if (isEditing && editingProject) {
+      updateMutation.mutate({ projectId: editingProject.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
   const onSurface = "var(--on-surface)";
@@ -147,7 +205,12 @@ export default function GroupDetailPage() {
         </div>
 
         {loadingStudents ? (
-          <div className="flex justify-center py-6"><Spinner size="sm" color="warning" /></div>
+          <div className="flex justify-center py-4">
+            <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{color: "var(--warning, #f59e0b)"}}>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
         ) : students.length === 0 ? (
           <div className="flex flex-col items-center text-center py-6 gap-2">
             <p style={{ fontSize: "0.8rem", color: onSurfaceVariant, fontFamily: "var(--font-dm-sans)", lineHeight: 1.5 }}>
@@ -222,11 +285,14 @@ export default function GroupDetailPage() {
             lineHeight: 1.2,
           }}
         >
-          {loadingGroup ? <Spinner size="sm" color="warning" /> : (group?.name ?? "Grupo")}
+          {loadingGroup ? <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{color: "var(--warning, #f59e0b)"}}>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg> : (group?.name ?? "Grupo")}
         </h1>
 
         <button
-          onClick={() => setShowForm(true)}
+          onClick={() => { setEditingProject(null); setShowForm(true); }}
           className="flex items-center gap-2 transition-all active:scale-95 hover:brightness-110"
           style={{
             background: primaryColor,
@@ -261,7 +327,7 @@ export default function GroupDetailPage() {
           }}
         >
           <p style={{ fontWeight: 700, fontSize: "1rem", fontFamily: "var(--font-dm-sans)", color: onSurface, marginBottom: "1.25rem" }}>
-            Nuevo proyecto integrador
+            {isEditing ? "Editar proyecto integrador" : "Nuevo proyecto integrador"}
           </p>
 
           <div className="grid gap-4">
@@ -360,15 +426,60 @@ export default function GroupDetailPage() {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={createMutation.isPending}
+                disabled={createMutation.isPending || updateMutation.isPending}
                 className="flex items-center gap-2 transition-all active:scale-95"
-                style={{ padding: "0.625rem 1.5rem", borderRadius: "0.875rem", border: "none", background: primaryColor, color: "#ffffff", fontSize: "0.875rem", fontWeight: 700, fontFamily: "var(--font-fraunces)", cursor: "pointer", opacity: createMutation.isPending ? 0.7 : 1 }}
+                style={{ padding: "0.625rem 1.5rem", borderRadius: "0.875rem", border: "none", background: primaryColor, color: "#ffffff", fontSize: "0.875rem", fontWeight: 700, fontFamily: "var(--font-fraunces)", cursor: "pointer", opacity: (createMutation.isPending || updateMutation.isPending) ? 0.7 : 1 }}
               >
-                {createMutation.isPending ? (
-                  <><Spinner size="sm" color="current" /> Creando…</>
+                {(createMutation.isPending || updateMutation.isPending) ? (
+                  <><Spinner size="sm" color="current" /> {isEditing ? "Guardando…" : "Creando…"}</>
                 ) : (
-                  "Crear proyecto"
+                  isEditing ? "Guardar cambios" : "Crear proyecto"
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete confirmation modal ───────────────────────────────────────── */}
+      {deletingProject && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}
+          onClick={() => setDeletingProject(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--surface)",
+              borderRadius: "1.5rem",
+              padding: "2rem",
+              maxWidth: "380px",
+              width: "90%",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+              border: "1px solid rgba(127,127,127,0.12)",
+            }}
+          >
+            <p style={{ fontWeight: 700, fontSize: "1rem", color: onSurface, fontFamily: "var(--font-dm-sans)", marginBottom: "0.5rem" }}>
+              ¿Eliminar proyecto?
+            </p>
+            <p style={{ fontSize: "0.875rem", color: onSurfaceVariant, fontFamily: "var(--font-dm-sans)", marginBottom: "1.5rem", lineHeight: 1.5 }}>
+              Se eliminará <strong style={{ color: onSurface }}>{deletingProject.name}</strong> junto con todas sus secuencias y actividades. Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeletingProject(null)}
+                style={{ padding: "0.625rem 1.25rem", borderRadius: "0.875rem", border: "1.5px solid var(--outline-variant)", background: "transparent", color: onSurfaceVariant, fontSize: "0.875rem", fontWeight: 600, fontFamily: "var(--font-dm-sans)", cursor: "pointer" }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate(deletingProject.id)}
+                disabled={deleteMutation.isPending}
+                className="flex items-center gap-2 transition-all active:scale-95"
+                style={{ padding: "0.625rem 1.5rem", borderRadius: "0.875rem", border: "none", background: "var(--danger)", color: "#ffffff", fontSize: "0.875rem", fontWeight: 700, fontFamily: "var(--font-fraunces)", cursor: "pointer", opacity: deleteMutation.isPending ? 0.7 : 1 }}
+              >
+                {deleteMutation.isPending ? <><Spinner size="sm" color="current" /> Eliminando…</> : "Eliminar"}
               </button>
             </div>
           </div>
@@ -377,8 +488,11 @@ export default function GroupDetailPage() {
 
       {/* ── Projects list ────────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Spinner color="warning" />
+        <div className="flex justify-center py-4">
+          <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{color: "var(--warning, #f59e0b)"}}>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
         </div>
       ) : projects.length === 0 ? (
         <div
@@ -392,7 +506,7 @@ export default function GroupDetailPage() {
             Este grupo no tiene proyectos integradores todavía
           </p>
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => { setEditingProject(null); setShowForm(true); }}
             className="transition-all active:scale-95 hover:brightness-110"
             style={{ background: primaryColor, color: "#ffffff", borderRadius: "1rem", border: "none", padding: "0.75rem 2rem", fontSize: "0.85rem", fontWeight: 700, fontFamily: "var(--font-fraunces)", cursor: "pointer", boxShadow: "0 8px 24px var(--primary-subtle)" }}
           >
@@ -408,6 +522,9 @@ export default function GroupDetailPage() {
               onSurface={onSurface}
               onSurfaceVariant={onSurfaceVariant}
               onClick={() => router.push(`/groups/${groupId}/projects/${project.id}`)}
+              onEdit={() => handleEditOpen(project)}
+              onDelete={() => setDeletingProject(project)}
+              isDeleting={deleteMutation.isPending && deletingProject?.id === project.id}
             />
           ))}
         </div>

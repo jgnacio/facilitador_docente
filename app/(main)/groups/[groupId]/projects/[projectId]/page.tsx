@@ -187,11 +187,19 @@ export default function ProjectDetailPage() {
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <h1 style={{ fontSize: "2rem", fontWeight: 400, fontFamily: "var(--font-fraunces)", color: onSurface, letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: "2rem" }}>
-        {loadingProject ? <Spinner size="sm" color="warning" /> : (project?.name ?? "Proyecto")}
+        {loadingProject ? <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{color: "var(--warning, #f59e0b)"}}>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg> : (project?.name ?? "Proyecto")}
       </h1>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Spinner color="warning" /></div>
+        <div className="flex justify-center py-4">
+          <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{color: "var(--warning, #f59e0b)"}}>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
       ) : (
         <div className="flex flex-col gap-8">
           {/* ── Secuencias ──────────────────────────────────────────────────── */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Folder, Calendar, ArrowRight, Trash2 } from "lucide-react";
+import { Folder, Calendar, ArrowRight, Trash2, Pencil } from "lucide-react";
 import { Spinner } from "@heroui/react";
 import { type IntegrativeProject, type ActivitySequence, type Activity } from "@/app/api-actions";
 
@@ -30,11 +30,17 @@ export function ProjectCard({
   onSurface,
   onSurfaceVariant,
   onClick,
+  onEdit,
+  onDelete,
+  isDeleting,
 }: {
   project: IntegrativeProject;
   onSurface: string;
   onSurfaceVariant: string;
   onClick: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  isDeleting?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -50,6 +56,7 @@ export function ProjectCard({
         padding: "1.25rem 1.5rem",
         border: `1px solid ${hovered ? "rgba(127,127,127,0.15)" : "rgba(127,127,127,0.08)"}`,
         transition: "border-color 0.18s ease",
+        position: "relative",
       }}
     >
       <div
@@ -137,15 +144,56 @@ export function ProjectCard({
         </div>
       </div>
 
-      <ArrowRight
-        size={15}
+      {/* ── Action buttons on hover ── */}
+      <div
+        className="flex items-center gap-1"
+        onClick={(e) => e.stopPropagation()}
         style={{
-          color: hovered ? "var(--primary)" : onSurfaceVariant,
-          opacity: hovered ? 0.9 : 0.2,
-          transition: "color 0.18s, opacity 0.18s",
+          opacity: hovered ? 1 : 0,
+          pointerEvents: hovered ? "auto" : "none",
+          transition: "opacity 0.18s",
           flexShrink: 0,
         }}
-      />
+      >
+        {onEdit && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            title="Editar proyecto"
+            style={{
+              width: "30px", height: "30px", borderRadius: "0.625rem",
+              border: "1.5px solid var(--outline-variant)", background: "var(--surface)",
+              color: onSurfaceVariant, display: "flex", alignItems: "center",
+              justifyContent: "center", cursor: "pointer",
+            }}
+          >
+            <Pencil size={13} strokeWidth={2} />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            disabled={isDeleting}
+            title="Eliminar proyecto"
+            style={{
+              width: "30px", height: "30px", borderRadius: "0.625rem",
+              border: "1.5px solid rgba(var(--danger-rgb, 220,38,38),0.3)", background: "var(--surface)",
+              color: "var(--danger)", display: "flex", alignItems: "center",
+              justifyContent: "center", cursor: "pointer",
+            }}
+          >
+            {isDeleting ? <Spinner size="sm" color="current" /> : <Trash2 size={13} strokeWidth={2} />}
+          </button>
+        )}
+        <ArrowRight
+          size={15}
+          style={{
+            color: hovered ? "var(--primary)" : onSurfaceVariant,
+            opacity: hovered ? 0.7 : 0.2,
+            transition: "color 0.18s, opacity 0.18s",
+            marginLeft: "0.25rem",
+          }}
+        />
+      </div>
     </div>
   );
 }
