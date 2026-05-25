@@ -187,6 +187,54 @@ export async function updatePlanificacion(id: number, data: {
 
 // ── Agente chat ───────────────────────────────────────────────────────────────
 
+export type ChatSession = {
+  id: string;
+  ap_session_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getChatSessions(): Promise<ChatSession[]> {
+  try {
+    const res = await fetch(`${API_URL}/agente/sessions/`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function deleteChatSession(id: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/agente/sessions/${id}`, {
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export type SessionMessage = { role: "user" | "agent"; text: string };
+
+export async function getSessionMessages(apSessionId: string): Promise<SessionMessage[]> {
+  try {
+    const res = await fetch(`${API_URL}/agente/sessions/${apSessionId}/messages`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
 export type PdfRef = { filename: string; page: number; label: string };
 export type AgentResponse = { text: string; refs: PdfRef[]; session_id: string };
 

@@ -1,18 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState, memo } from "react";
+import { flushSync } from "react-dom";
 
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import { Button, Card } from "@heroui/react";
-import { createAdkSession, type PdfRef } from "../../api-actions";
+import { getChatSessions, deleteChatSession, getSessionMessages, type ChatSession, type PdfRef } from "../../api-actions";
 import { BookOpen, HeartHandshake, Layers, Lightbulb, Sparkles, Plus, Mic, Hammer, SendHorizontal, RotateCcw } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
-const AGENT_BASE = process.env.NEXT_PUBLIC_AGENT_URL ?? API_BASE;
+const AGENT_BASE = API_BASE;
 
 type Role = "user" | "agent" | "error";
 
@@ -75,8 +76,6 @@ const generateId = () => {
   }
   return Math.random().toString(36).slice(2, 11);
 };
-
-const SESSION_ID = `web-${Math.random().toString(36).slice(2, 10)}`;
 
 function parseAgentResponse(data: unknown): {
   text: string; refs: PdfRef[];
@@ -191,7 +190,12 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
   const [sessionReady, setReady]      = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [showContext, setShowContext]  = useState(!!contextLabel);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [sessions, setSessions]       = useState<ChatSession[]>([]);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const bottomRef                     = useRef<HTMLDivElement>(null);
+  const scrollContainerRef            = useRef<HTMLDivElement>(null);
   const textareaRef                   = useRef<HTMLTextAreaElement>(null);
   const contextUsed                   = useRef(false);
   const { getToken }                  = useAuth();
@@ -207,11 +211,12 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
   const shadowCard    = "var(--shadow-ambient)";
 
   useEffect(() => {
-    createAdkSession(SESSION_ID).then(() => setReady(true));
+    getChatSessions().then(setSessions).finally(() => setReady(true));
   }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages, loading]);
 
   const send = async (text: string) => {
@@ -239,7 +244,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ message: agentMessage, session_id: SESSION_ID }),
+        body: JSON.stringify({ message: agentMessage, session_id: currentSessionId }),
       });
 
 
@@ -264,6 +269,10 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
             setStreamingText((prev) => prev + evt.text);
           } else if (evt.type === "done") {
             setStreamingText("");
+            if (evt.session_id && evt.session_id !== currentSessionId) {
+              setCurrentSessionId(evt.session_id);
+              getChatSessions().then(setSessions);
+            }
             const reply = parseAgentResponse({ session_id: evt.session_id, response: evt.response });
             setMessages((prev) => [...prev, {
               id: generateId(), role: "agent",
@@ -284,7 +293,45 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
 
   const reset = () => {
     setMessages([]);
-    createAdkSession(`web-${Math.random().toString(36).slice(2, 10)}`);
+    setCurrentSessionId(null);
+  };
+
+  const selectSession = async (session: ChatSession) => {
+    setCurrentSessionId(session.ap_session_id);
+    setMessages([]);
+    setShowSidebar(false);
+    setLoadingHistory(true);
+    const raw = await getSessionMessages(session.ap_session_id);
+    const converted: Message[] = raw.map((m) => {
+      if (m.role === "user") {
+        return { id: generateId(), role: "user" as const, text: m.text, refs: [] };
+      }
+      const parsed = parseAgentResponse({ response: m.text });
+      return {
+        id: generateId(), role: "agent" as const,
+        text: parsed.text, refs: parsed.refs,
+        curriculum_match: parsed.curriculum_match,
+        planificacion: parsed.planificacion,
+        secuencia: parsed.secuencia,
+      };
+    });
+    flushSync(() => {
+      setMessages(converted);
+      setLoadingHistory(false);
+    });
+    const el = scrollContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
+
+  const deleteSession = async (id: string) => {
+    const deleted = sessions.find((s) => s.id === id);
+    const ok = await deleteChatSession(id);
+    if (!ok) return;
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    if (deleted && deleted.ap_session_id === currentSessionId) {
+      setCurrentSessionId(null);
+      setMessages([]);
+    }
   };
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -298,7 +345,21 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 relative">
+
+      {/* ── Session Sidebar ──────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSidebar && (
+          <SessionSidebar
+            sessions={sessions}
+            currentApSessionId={currentSessionId}
+            onSelect={selectSession}
+            onDelete={deleteSession}
+            onNewChat={reset}
+            onClose={() => setShowSidebar(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div
@@ -315,12 +376,13 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={reset}
-            aria-label="Nueva sesión"
-            className="rounded-xl transition-all active:scale-95 p-2"
+            onClick={() => setShowSidebar((v) => !v)}
+            aria-label="Historial de conversaciones"
+            className="flex items-center gap-1.5 rounded-xl transition-all active:scale-95 px-3 py-2 text-sm font-medium"
             style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}
           >
-            <ResetIcon />
+            <HistoryIcon />
+            Chats
           </button>
         </div>
       </div>
@@ -358,6 +420,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
 
       {/* ── Messages / Welcome ────────────────────────────────────────── */}
       <div
+        ref={scrollContainerRef}
         className="flex-1 overflow-y-auto w-full min-h-0 flex flex-col items-center"
         style={{ padding: "1.5rem 1.25rem", gap: "1rem" }}
       >
@@ -404,6 +467,11 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
           )}
         </AnimatePresence>
         
+        {loadingHistory && (
+          <div className="flex justify-center py-6" style={{ color: "var(--on-surface-variant)" }}>
+            <span className="text-sm animate-pulse">Cargando conversación…</span>
+          </div>
+        )}
         {loading && !streamingText && <TypingIndicator label={statusLabel} surfaceLow={surfaceLow} onVariant={onVariant} />}
         {streamingText && (
           <div className="w-full max-w-4xl flex justify-start px-2">
@@ -1239,5 +1307,171 @@ function PdfIcon() {
       <line x1="9" y1="13" x2="15" y2="13" />
       <line x1="9" y1="17" x2="15" y2="17" />
     </svg>
+  );
+}
+function HistoryIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
+    </svg>
+  );
+}
+
+// ── Chat History helpers ───────────────────────────────────────────────────────
+
+function relativeDate(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `Hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `Hace ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `Hace ${days} día${days !== 1 ? "s" : ""}`;
+}
+
+function TrashIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  );
+}
+
+function SessionSidebar({
+  sessions,
+  currentApSessionId,
+  onSelect,
+  onDelete,
+  onNewChat,
+  onClose,
+}: {
+  sessions: ChatSession[];
+  currentApSessionId: string | null;
+  onSelect: (s: ChatSession) => void;
+  onDelete: (id: string) => void;
+  onNewChat: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ x: "-100%", opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: "-100%", opacity: 0 }}
+      transition={{ type: "spring", stiffness: 320, damping: 30 }}
+      className="absolute inset-y-0 left-0 z-10 w-72 flex flex-col"
+      style={{
+        background: "var(--surface-container-low)",
+        boxShadow: "2px 0 16px rgba(0,0,0,0.10)",
+        borderRight: "1px solid var(--border-subtle)",
+      }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-4 py-4 flex-shrink-0"
+        style={{ borderBottom: "1px solid var(--border-subtle)" }}
+      >
+        <span
+          className="font-bold text-sm"
+          style={{ color: "var(--on-surface)", fontFamily: "var(--font-display)" }}
+        >
+          Conversaciones
+        </span>
+        <button
+          onClick={onClose}
+          aria-label="Cerrar historial"
+          className="rounded-lg p-1 transition-opacity hover:opacity-70"
+          style={{ color: "var(--on-surface-variant)", background: "none", border: "none", cursor: "pointer" }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      {/* New conversation button */}
+      <div className="px-3 pt-3 pb-2 flex-shrink-0">
+        <button
+          onClick={() => { onNewChat(); onClose(); }}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all active:scale-95"
+          style={{
+            background: "var(--primary)",
+            color: "#fff",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: "var(--font-display)",
+            fontWeight: 600,
+            fontSize: "0.8rem",
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Nueva conversación
+        </button>
+      </div>
+
+      {/* Session list */}
+      <div className="flex-1 overflow-y-auto px-2 pb-4">
+        {sessions.length === 0 ? (
+          <p
+            className="text-center py-8 text-xs"
+            style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}
+          >
+            Sin conversaciones aún
+          </p>
+        ) : (
+          sessions.map((session) => {
+            const isActive = session.ap_session_id === currentApSessionId;
+            return (
+              <div
+                key={session.id}
+                className="group flex items-center gap-2 rounded-xl px-3 py-2.5 mb-1 cursor-pointer transition-all"
+                style={{
+                  background: isActive
+                    ? "color-mix(in srgb, var(--primary) 14%, transparent)"
+                    : "transparent",
+                  border: isActive
+                    ? "1px solid color-mix(in srgb, var(--primary) 25%, transparent)"
+                    : "1px solid transparent",
+                }}
+                onClick={() => onSelect(session)}
+              >
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="truncate text-sm font-medium"
+                    style={{
+                      color: isActive ? "var(--primary)" : "var(--on-surface)",
+                      fontFamily: "var(--font-display)",
+                    }}
+                  >
+                    {session.title}
+                  </p>
+                  <p
+                    className="text-xs mt-0.5"
+                    style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}
+                  >
+                    {relativeDate(session.updated_at)}
+                  </p>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(session.id); }}
+                  aria-label="Eliminar conversación"
+                  className="flex-shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1 transition-all hover:opacity-70"
+                  style={{ color: "var(--on-surface-variant)", background: "none", border: "none", cursor: "pointer" }}
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </motion.div>
   );
 }

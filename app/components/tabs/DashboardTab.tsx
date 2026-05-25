@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Spinner } from "@heroui/react";
-import { Users, Plus, Calendar, ArrowRight } from "lucide-react";
+import { Users, Plus, Calendar, ArrowRight, Pencil, Trash2 } from "lucide-react";
 import {
   getGroups,
   createGroup,
+  updateGroup,
+  deleteGroup,
   type Group,
 } from "../../api-actions";
 
@@ -36,6 +38,11 @@ const TRAMO_GROUPS: { tramoKey: string; tramoLabel: string; grados: string[] }[]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function findGradoKey(level?: string): string {
+  if (!level) return "";
+  return Object.keys(GRADOS).find((k) => GRADOS[k].label === level) ?? "";
+}
+
 function formatDate(dateStr?: string): string {
   if (!dateStr) return "";
   try {
@@ -53,6 +60,8 @@ export default function DashboardTab() {
   const queryClient = useQueryClient();
 
   const [showForm, setShowForm] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<Group | null>(null);
   const [formName, setFormName] = useState("");
   const [formLevel, setFormLevel] = useState("");
   const [formStartDate, setFormStartDate] = useState("");
@@ -82,8 +91,34 @@ export default function DashboardTab() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateGroup>[1] }) =>
+      updateGroup(id, data),
+    onSuccess: (result) => {
+      if (!result) {
+        setFormError("No se pudo actualizar el grupo.");
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ["groups"] });
+      resetForm();
+    },
+    onError: () => {
+      setFormError("Error al actualizar el grupo.");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteGroup(id),
+    onSuccess: (ok) => {
+      if (!ok) return;
+      queryClient.invalidateQueries({ queryKey: ["groups"] });
+      setConfirmDeleteGroup(null);
+    },
+  });
+
   const resetForm = () => {
     setShowForm(false);
+    setEditingGroup(null);
     setFormName("");
     setFormLevel("");
     setFormStartDate("");
@@ -92,17 +127,35 @@ export default function DashboardTab() {
     setTouched(false);
   };
 
+  const handleEditOpen = (group: Group) => {
+    setEditingGroup(group);
+    setFormName(group.name);
+    setFormLevel(findGradoKey(group.level));
+    setFormStartDate(group.start_date ?? "");
+    setFormEndDate(group.end_date ?? "");
+    setFormError("");
+    setTouched(false);
+    setShowForm(true);
+  };
+
+  const isPending = editingGroup ? updateMutation.isPending : createMutation.isPending;
+
   const handleSubmit = () => {
     setTouched(true);
     if (!formName.trim()) return;
     setFormError("");
-    createMutation.mutate({
+    const payload = {
       name: formName.trim(),
       stage: derivedTramo?.tramoLabel,
       level: derivedTramo ? GRADOS[formLevel].label : undefined,
       start_date: formStartDate || undefined,
       end_date: formEndDate || undefined,
-    });
+    };
+    if (editingGroup) {
+      updateMutation.mutate({ id: editingGroup.id, data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
   };
 
   const onSurface = "var(--on-surface)";
@@ -171,7 +224,7 @@ export default function DashboardTab() {
               marginBottom: "1.25rem",
             }}
           >
-            Crear nuevo grupo
+            {editingGroup ? `Editar grupo` : "Crear nuevo grupo"}
           </p>
 
           <div className="grid gap-4">
@@ -277,15 +330,60 @@ export default function DashboardTab() {
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={createMutation.isPending}
+                disabled={isPending}
                 className="flex items-center gap-2 transition-all active:scale-95"
-                style={{ padding: "0.625rem 1.5rem", borderRadius: "0.875rem", border: "none", background: primaryColor, color: "#ffffff", fontSize: "0.875rem", fontWeight: 700, fontFamily: "var(--font-fraunces)", cursor: "pointer", opacity: createMutation.isPending ? 0.7 : 1 }}
+                style={{ padding: "0.625rem 1.5rem", borderRadius: "0.875rem", border: "none", background: primaryColor, color: "#ffffff", fontSize: "0.875rem", fontWeight: 700, fontFamily: "var(--font-fraunces)", cursor: "pointer", opacity: isPending ? 0.7 : 1 }}
               >
-                {createMutation.isPending ? (
-                  <><Spinner size="sm" color="current" /> Creando…</>
+                {isPending ? (
+                  <><Spinner size="sm" color="current" /> {editingGroup ? "Guardando…" : "Creando…"}</>
                 ) : (
-                  "Crear grupo"
+                  editingGroup ? "Guardar cambios" : "Crear grupo"
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete confirmation modal ────────────────────────────────────────── */}
+      {confirmDeleteGroup && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}
+          onClick={() => setConfirmDeleteGroup(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--surface)",
+              borderRadius: "1.5rem",
+              padding: "2rem",
+              maxWidth: "380px",
+              width: "90%",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+              border: "1px solid rgba(127,127,127,0.12)",
+            }}
+          >
+            <p style={{ fontWeight: 700, fontSize: "1rem", color: onSurface, fontFamily: "var(--font-dm-sans)", marginBottom: "0.5rem" }}>
+              ¿Eliminar grupo?
+            </p>
+            <p style={{ fontSize: "0.875rem", color: onSurfaceVariant, fontFamily: "var(--font-dm-sans)", marginBottom: "1.5rem", lineHeight: 1.5 }}>
+              Se eliminará <strong style={{ color: onSurface }}>{confirmDeleteGroup.name}</strong> junto con todos sus proyectos y secuencias. Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDeleteGroup(null)}
+                style={{ padding: "0.625rem 1.25rem", borderRadius: "0.875rem", border: "1.5px solid var(--outline-variant)", background: "transparent", color: onSurfaceVariant, fontSize: "0.875rem", fontWeight: 600, fontFamily: "var(--font-dm-sans)", cursor: "pointer" }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate(confirmDeleteGroup.id)}
+                disabled={deleteMutation.isPending}
+                className="flex items-center gap-2 transition-all active:scale-95"
+                style={{ padding: "0.625rem 1.5rem", borderRadius: "0.875rem", border: "none", background: "var(--danger)", color: "#ffffff", fontSize: "0.875rem", fontWeight: 700, fontFamily: "var(--font-fraunces)", cursor: "pointer", opacity: deleteMutation.isPending ? 0.7 : 1 }}
+              >
+                {deleteMutation.isPending ? <><Spinner size="sm" color="current" /> Eliminando…</> : "Eliminar"}
               </button>
             </div>
           </div>
@@ -364,6 +462,8 @@ export default function DashboardTab() {
               onSurface={onSurface}
               onSurfaceVariant={onSurfaceVariant}
               onClick={() => router.push(`/groups/${group.id}`)}
+              onEdit={() => handleEditOpen(group)}
+              onDelete={() => setConfirmDeleteGroup(group)}
             />
           ))}
         </div>
@@ -379,20 +479,23 @@ function GroupCard({
   onSurface,
   onSurfaceVariant,
   onClick,
+  onEdit,
+  onDelete,
 }: {
   group: Group;
   onSurface: string;
   onSurfaceVariant: string;
   onClick: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
 
   return (
-    <button
+    <div
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="text-left w-full"
       style={{
         background: "var(--surface-container-low)",
         borderRadius: "1.5rem",
@@ -401,12 +504,53 @@ function GroupCard({
         transform: hovered ? "translateY(-4px)" : "translateY(0)",
         transition: "all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)",
         border: "1px solid rgba(127, 127, 127, 0.08)",
-        cursor: "pointer",
         display: "flex",
         flexDirection: "column",
         gap: "0.75rem",
+        position: "relative",
+        cursor: "pointer",
       }}
     >
+      {/* ── Action buttons ─────────────────────────────────────────────────── */}
+      <div
+        className="flex gap-1"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "absolute",
+          top: "1rem",
+          right: "1rem",
+          opacity: hovered ? 1 : 0,
+          pointerEvents: hovered ? "auto" : "none",
+          transition: "opacity 0.18s",
+        }}
+      >
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}
+          title="Editar grupo"
+          style={{
+            width: "30px", height: "30px", borderRadius: "0.625rem",
+            border: "1.5px solid var(--outline-variant)", background: "var(--surface)",
+            color: onSurfaceVariant, display: "flex", alignItems: "center",
+            justifyContent: "center", cursor: "pointer",
+          }}
+        >
+          <Pencil size={13} strokeWidth={2} />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          title="Eliminar grupo"
+          style={{
+            width: "30px", height: "30px", borderRadius: "0.625rem",
+            border: "1.5px solid rgba(var(--danger-rgb, 220,38,38),0.3)", background: "var(--surface)",
+            color: "var(--danger)", display: "flex", alignItems: "center",
+            justifyContent: "center", cursor: "pointer",
+          }}
+        >
+          <Trash2 size={13} strokeWidth={2} />
+        </button>
+      </div>
+
+      {/* ── Card content ───────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-2">
         <div
           style={{
@@ -426,12 +570,12 @@ function GroupCard({
         <ArrowRight
           size={15}
           style={{
-            color: hovered ? "var(--primary)" : onSurfaceVariant,
-            opacity: hovered ? 1 : 0.4,
+            color: onSurfaceVariant,
+            opacity: hovered ? 0 : 0.4,
             transition: "all 0.18s",
-            transform: hovered ? "translateX(2px)" : "translateX(0)",
             flexShrink: 0,
             marginTop: "4px",
+            pointerEvents: "none",
           }}
         />
       </div>
@@ -480,6 +624,6 @@ function GroupCard({
           </div>
         )}
       </div>
-    </button>
+    </div>
   );
 }
