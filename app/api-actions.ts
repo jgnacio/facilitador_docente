@@ -34,6 +34,7 @@ export type Alumno = {
   nivel?: string;
   grado?: string;
   notas?: string;
+  group_id?: string;
 };
 
 // ── Planificaciones ───────────────────────────────────────────────────────────
@@ -113,12 +114,26 @@ export async function getAlumnos(): Promise<Alumno[]> {
   }
 }
 
+export async function getAlumnosByGroup(groupId: string): Promise<Alumno[]> {
+  try {
+    const res = await fetch(`${API_URL}/groups/${groupId}/students/`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
 export async function createAlumno(data: {
   nombre_completo: string;
   fecha_nacimiento?: string;
   nivel?: string;
   grado?: string;
   notas?: string;
+  group_id?: string;
 }): Promise<Alumno | null> {
   try {
     const res = await fetch(`${API_URL}/alumnos/`, {
@@ -139,6 +154,7 @@ export async function updateAlumno(id: number, data: {
   nivel?: string;
   grado?: string;
   notas?: string;
+  group_id?: string | null;
 }): Promise<Alumno | null> {
   try {
     const res = await fetch(`${API_URL}/alumnos/${id}`, {

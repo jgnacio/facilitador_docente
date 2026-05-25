@@ -6,14 +6,16 @@ import {
   TextField, Label, Input, TextArea, FieldError,
   Select, ListBox,
 } from "@heroui/react";
-import { getAlumnos, createAlumno, updateAlumno, deleteAlumno, type Alumno } from "../../api-actions";
+import { getAlumnos, getGroups, createAlumno, updateAlumno, deleteAlumno, type Alumno, type Group } from "../../api-actions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const NIVELES = ["Inicial", "Primaria", "Secundaria"];
-const GRADOS = [
-  "Nivel 3 años", "Nivel 4 años", "Nivel 5 años",
-  "1.er grado", "2.do grado", "3.er grado",
-  "4.to grado", "5.to grado", "6.to grado",
+
+const TRAMO_GROUPS: { tramoKey: string; tramoLabel: string; grados: string[] }[] = [
+  { tramoKey: "tramo_1", tramoLabel: "Tramo 1", grados: ["Nivel 3 años", "Nivel 4 años", "Nivel 5 años"] },
+  { tramoKey: "tramo_2", tramoLabel: "Tramo 2", grados: ["1.er grado", "2.do grado"] },
+  { tramoKey: "tramo_3", tramoLabel: "Tramo 3", grados: ["3.er grado", "4.to grado"] },
+  { tramoKey: "tramo_4", tramoLabel: "Tramo 4", grados: ["5.to grado", "6.to grado"] },
 ];
 
 const COLORS: Array<"default" | "accent" | "success" | "warning" | "danger"> = [
@@ -39,6 +41,13 @@ export default function AlumnosTab() {
     queryFn: getAlumnos,
   });
 
+  const { data: groups = [] } = useQuery({
+    queryKey: ["groups"],
+    queryFn: getGroups,
+  });
+
+  const groupMap = Object.fromEntries(groups.map((g) => [g.id, g]));
+
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["alumnos"] });
 
   const filtered = alumnos.filter((a) =>
@@ -56,6 +65,7 @@ export default function AlumnosTab() {
   if (view === "create") {
     return (
       <AlumnoForm
+        groups={groups}
         onBack={() => setView("list")}
         onSaved={() => { setView("list"); refresh(); }}
       />
@@ -66,6 +76,7 @@ export default function AlumnosTab() {
     return (
       <AlumnoForm
         alumno={editing}
+        groups={groups}
         onBack={() => { setView("list"); setEditing(null); }}
         onSaved={() => { setView("list"); setEditing(null); refresh(); }}
       />
@@ -118,6 +129,7 @@ export default function AlumnosTab() {
             <AlumnoCard
               key={a.id}
               alumno={a}
+              group={a.group_id ? groupMap[a.group_id] : undefined}
               onEdit={() => handleEdit(a)}
               onDelete={() => handleDelete(a)}
             />
@@ -130,8 +142,9 @@ export default function AlumnosTab() {
 
 // ── Alumno card ───────────────────────────────────────────────────────────────
 
-function AlumnoCard({ alumno, onEdit, onDelete }: {
+function AlumnoCard({ alumno, group, onEdit, onDelete }: {
   alumno: Alumno;
+  group?: Group;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -143,11 +156,19 @@ function AlumnoCard({ alumno, onEdit, onDelete }: {
       </Avatar>
       <div className="flex-1 min-w-0 mt-0.5">
         <p className="font-semibold text-foreground text-sm">{alumno.nombre_completo}</p>
-        {sub && (
-          <Chip variant="soft" color="default" size="sm" className="mt-1">
-            {sub}
-          </Chip>
-        )}
+        <div className="flex flex-wrap gap-1 mt-1">
+          {sub && (
+            <Chip variant="soft" color="default" size="sm">{sub}</Chip>
+          )}
+          {group && (
+            <Chip variant="soft" color="accent" size="sm">
+              <span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+                <GroupIcon size={11} />
+                {group.name}
+              </span>
+            </Chip>
+          )}
+        </div>
         {alumno.notas && (
           <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{alumno.notas}</p>
         )}
@@ -174,8 +195,9 @@ function AlumnoCard({ alumno, onEdit, onDelete }: {
 
 // ── Alumno form (create + edit) ───────────────────────────────────────────────
 
-function AlumnoForm({ alumno, onBack, onSaved }: {
+function AlumnoForm({ alumno, groups, onBack, onSaved }: {
   alumno?: Alumno;
+  groups: Group[];
   onBack: () => void;
   onSaved: () => void;
 }) {
@@ -185,6 +207,7 @@ function AlumnoForm({ alumno, onBack, onSaved }: {
   const [nivel, setNivel]         = useState(alumno?.nivel ?? "");
   const [grado, setGrado]         = useState(alumno?.grado ?? "");
   const [notas, setNotas]         = useState(alumno?.notas ?? "");
+  const [groupId, setGroupId]     = useState(alumno?.group_id ?? "");
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
   const [touched, setTouched]     = useState(false);
@@ -202,8 +225,8 @@ function AlumnoForm({ alumno, onBack, onSaved }: {
       notas: notas.trim() || undefined,
     };
     const result = isEdit && alumno
-      ? await updateAlumno(alumno.id, data)
-      : await createAlumno(data);
+      ? await updateAlumno(alumno.id, { ...data, group_id: groupId || null })
+      : await createAlumno({ ...data, group_id: groupId || undefined });
     setSaving(false);
     if (result) onSaved();
     else setError("Error al guardar. Verificá que la API esté activa.");
@@ -233,56 +256,82 @@ function AlumnoForm({ alumno, onBack, onSaved }: {
           {touched && !nombre.trim() && <FieldError>El nombre es requerido.</FieldError>}
         </TextField>
 
-        <TextField fullWidth value={nacimiento} onChange={setNacimiento}>
-          <Label>Fecha de nacimiento</Label>
-          <Input placeholder="dd/mm/aaaa" />
-        </TextField>
+        <div>
+          <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--on-surface-variant)", marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>
+            Fecha de nacimiento
+          </label>
+          <input
+            type="date"
+            value={nacimiento}
+            onChange={(e) => setNacimiento(e.target.value)}
+            style={{ width: "100%", padding: "0.625rem 1rem", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "var(--surface)", color: "var(--on-surface)", fontSize: "0.875rem", fontFamily: "var(--font-dm-sans)", outline: "none" }}
+          />
+        </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <Select
-            fullWidth
-            placeholder="Seleccionar"
-            value={nivel || null}
-            onChange={(key) => setNivel(String(key ?? ""))}
-          >
-            <Label>Nivel</Label>
-            <Select.Trigger>
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                {NIVELES.map((n) => (
-                  <ListBox.Item key={n} id={n} textValue={n}>
-                    {n}<ListBox.ItemIndicator />
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-          </Select>
+          <div>
+            <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--on-surface-variant)", marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>
+              Nivel
+            </label>
+            <select
+              value={nivel}
+              onChange={(e) => setNivel(e.target.value)}
+              style={{ width: "100%", padding: "0.625rem 1rem", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "var(--surface)", color: nivel ? "var(--on-surface)" : "var(--on-surface-variant)", fontSize: "0.875rem", fontFamily: "var(--font-dm-sans)", outline: "none", cursor: "pointer", appearance: "auto" }}
+            >
+              <option value="">Seleccioná el nivel</option>
+              {NIVELES.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </div>
 
+          <div>
+            <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--on-surface-variant)", marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>
+              Grado
+            </label>
+            <select
+              value={grado}
+              onChange={(e) => setGrado(e.target.value)}
+              style={{ width: "100%", padding: "0.625rem 1rem", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "var(--surface)", color: grado ? "var(--on-surface)" : "var(--on-surface-variant)", fontSize: "0.875rem", fontFamily: "var(--font-dm-sans)", outline: "none", cursor: "pointer", appearance: "auto" }}
+            >
+              <option value="">Seleccioná el grado</option>
+              {TRAMO_GROUPS.map(({ tramoKey, tramoLabel, grados }) => (
+                <optgroup key={tramoKey} label={tramoLabel}>
+                  {grados.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {groups.length > 0 && (
           <Select
             fullWidth
-            placeholder="Seleccionar"
-            value={grado || null}
-            onChange={(key) => setGrado(String(key ?? ""))}
+            placeholder="Sin grupo asignado"
+            value={groupId || null}
+            onChange={(key) => setGroupId(String(key ?? ""))}
           >
-            <Label>Grado</Label>
+            <Label>Grupo</Label>
             <Select.Trigger>
               <Select.Value />
               <Select.Indicator />
             </Select.Trigger>
             <Select.Popover>
               <ListBox>
-                {GRADOS.map((g) => (
-                  <ListBox.Item key={g} id={g} textValue={g}>
-                    {g}<ListBox.ItemIndicator />
+                <ListBox.Item key="" id="" textValue="Sin grupo">
+                  Sin grupo<ListBox.ItemIndicator />
+                </ListBox.Item>
+                {groups.map((g) => (
+                  <ListBox.Item key={g.id} id={g.id} textValue={g.name}>
+                    {g.name}<ListBox.ItemIndicator />
                   </ListBox.Item>
                 ))}
               </ListBox>
             </Select.Popover>
           </Select>
-        </div>
+        )}
 
         <TextField fullWidth value={notas} onChange={setNotas}>
           <Label>Singularidades / Notas</Label>

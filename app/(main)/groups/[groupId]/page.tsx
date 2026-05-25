@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Spinner } from "@heroui/react";
-import { ChevronRight, Folder, Plus } from "lucide-react";
+import { ChevronRight, Folder, Plus, Users } from "lucide-react";
 import {
   getGroup,
   getProjects,
   createProject,
+  getAlumnosByGroup,
 } from "@/app/api-actions";
 import { ProjectCard } from "@/app/components/cards";
 
@@ -51,6 +52,12 @@ export default function GroupDetailPage() {
   const { data: projects = [], isPending: loadingProjects } = useQuery({
     queryKey: ["projects", groupId],
     queryFn: () => getProjects(groupId),
+    enabled: Boolean(groupId),
+  });
+
+  const { data: students = [], isPending: loadingStudents } = useQuery({
+    queryKey: ["students", groupId],
+    queryFn: () => getAlumnosByGroup(groupId),
     enabled: Boolean(groupId),
   });
 
@@ -101,7 +108,93 @@ export default function GroupDetailPage() {
   const loading = loadingGroup || loadingProjects;
 
   return (
+    <>
+    {/* ── Panel de alumnos — fijo, solo en pantallas anchas ───────────────────── */}
+    <aside
+      className="hidden 2xl:block"
+      style={{
+        position: "fixed",
+        top: "80px",
+        left: "max(1rem, calc(50vw - 550px - 324px))",
+        width: "300px",
+        maxHeight: "calc(100vh - 96px)",
+        overflowY: "auto",
+        zIndex: 10,
+      }}
+    >
+      <div
+        style={{
+          background: "var(--surface-container-low)",
+          borderRadius: "1.5rem",
+          padding: "1.5rem",
+          border: "1px solid rgba(127, 127, 127, 0.08)",
+        }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div style={{ width: "28px", height: "28px", borderRadius: "0.625rem", background: "var(--primary-subtle)", display: "flex", alignItems: "center", justifyContent: "center", color: primaryColor, flexShrink: 0 }}>
+              <Users size={14} strokeWidth={2} />
+            </div>
+            <p style={{ fontWeight: 700, fontSize: "0.875rem", fontFamily: "var(--font-dm-sans)", color: onSurface }}>
+              Alumnos
+            </p>
+          </div>
+          {!loadingStudents && (
+            <span style={{ fontSize: "0.72rem", fontWeight: 600, color: onSurfaceVariant, fontFamily: "var(--font-dm-sans)", background: "var(--surface)", borderRadius: "0.5rem", padding: "0.15rem 0.5rem", border: "1px solid var(--outline-variant)" }}>
+              {students.length}
+            </span>
+          )}
+        </div>
+
+        {loadingStudents ? (
+          <div className="flex justify-center py-6"><Spinner size="sm" color="warning" /></div>
+        ) : students.length === 0 ? (
+          <div className="flex flex-col items-center text-center py-6 gap-2">
+            <p style={{ fontSize: "0.8rem", color: onSurfaceVariant, fontFamily: "var(--font-dm-sans)", lineHeight: 1.5 }}>
+              No hay alumnos asignados a este grupo
+            </p>
+            <p style={{ fontSize: "0.72rem", color: onSurfaceVariant, opacity: 0.6, fontFamily: "var(--font-dm-sans)" }}>
+              Asigná alumnos desde la pestaña Alumnos
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {students.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center gap-2.5"
+                style={{ padding: "0.5rem 0.625rem", borderRadius: "0.875rem", background: "var(--surface)" }}
+              >
+                <div
+                  style={{
+                    width: "30px", height: "30px", borderRadius: "0.625rem", flexShrink: 0,
+                    background: "var(--primary-subtle)", display: "flex", alignItems: "center",
+                    justifyContent: "center", color: primaryColor,
+                    fontSize: "0.75rem", fontWeight: 700, fontFamily: "var(--font-dm-sans)",
+                  }}
+                >
+                  {s.nombre_completo?.[0]?.toUpperCase() ?? "?"}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: "0.8rem", fontWeight: 600, color: onSurface, fontFamily: "var(--font-dm-sans)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {s.nombre_completo}
+                  </p>
+                  {(s.nivel || s.grado) && (
+                    <p style={{ fontSize: "0.68rem", color: onSurfaceVariant, fontFamily: "var(--font-dm-sans)", opacity: 0.7 }}>
+                      {[s.nivel, s.grado].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </aside>
+
+    {/* ── Contenido principal ──────────────────────────────────────────────────── */}
     <div style={{ padding: "2rem 2.5rem", maxWidth: "1100px", margin: "0 auto" }}>
+
       {/* ── Breadcrumb ───────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 mb-6" style={{ fontSize: "0.82rem", fontFamily: "var(--font-dm-sans)", color: onSurfaceVariant }}>
         <button
@@ -319,7 +412,9 @@ export default function GroupDetailPage() {
           ))}
         </div>
       )}
+
     </div>
+    </>
   );
 }
 
