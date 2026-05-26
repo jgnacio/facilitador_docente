@@ -32,12 +32,18 @@ const styles = StyleSheet.create({
   planStep: { fontSize: 8, color: "#374151", lineHeight: 1.4, marginBottom: 2 },
 });
 
+type PlanificacionMomento = {
+  momento: string; duracion: string; meta_aprendizaje?: string;
+  actividad: string; rol_docente: string; recursos: string;
+};
+
 type SecuenciaActividad = {
-  numero: number;
-  recorte: string;
-  meta_aprendizaje: string;
-  plan_aprendizaje: string[];
-  recursos?: string;
+  // Nuevo formato
+  titulo?: string; metodologia?: string; momentos?: PlanificacionMomento[];
+  ce_codigo?: string; ce_texto?: string; criterio_de_logro?: string;
+  // Formato legacy
+  numero?: number; recorte?: string; meta_aprendizaje?: string;
+  plan_aprendizaje?: string[]; recursos?: string;
 };
 
 type SecuenciaData = {
@@ -131,26 +137,47 @@ export function SecuenciaPDF({ data, nombre }: { data: SecuenciaData; nombre: st
 
         {/* Tabla de actividades */}
         <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.th, styles.colNum]}>ACT.</Text>
-            <Text style={[styles.th, styles.colRecorte]}>Recorte</Text>
-            <Text style={[styles.th, styles.colMeta]}>Meta de aprendizaje</Text>
-            <Text style={[styles.th, styles.colPlan]}>Plan de aprendizaje</Text>
-            <Text style={[styles.th, styles.colRecursos]}>Recursos</Text>
-          </View>
-          {data.actividades.map((act, i) => (
-            <View key={i} style={i < data.actividades.length - 1 ? styles.tableRow : styles.tableRowLast}>
-              <Text style={[styles.td, styles.colNum, { fontFamily: "Helvetica-Bold" }]}>{act.numero}.</Text>
-              <Text style={[styles.td, styles.colRecorte]}>{act.recorte}</Text>
-              <Text style={[styles.td, styles.colMeta]}>{act.meta_aprendizaje}</Text>
-              <View style={[styles.td, styles.colPlan]}>
-                {act.plan_aprendizaje.map((paso, j) => (
-                  <Text key={j} style={styles.planStep}>- {paso}</Text>
+          {data.actividades.map((act, i) => {
+            const isNew = Array.isArray(act.momentos) && act.momentos.length > 0;
+            const isLast = i === data.actividades.length - 1;
+            return (
+              <View key={i}>
+                {/* Fila encabezado de la actividad */}
+                <View style={[styles.tableRow, { backgroundColor: "#f8fafc" }]}>
+                  <Text style={[styles.td, { width: "5%", fontFamily: "Helvetica-Bold" }]}>{i + 1}.</Text>
+                  <Text style={[styles.td, { flex: 1, fontFamily: "Helvetica-Bold" }]}>
+                    {isNew ? (act.titulo ?? "") : (act.recorte ?? "")}
+                    {isNew && act.metodologia ? `  [${act.metodologia}]` : ""}
+                  </Text>
+                </View>
+                {/* Nuevo formato: filas de momentos */}
+                {isNew && (act.momentos ?? []).map((m, j) => (
+                  <View key={j} style={j === (act.momentos!.length - 1) && isLast ? styles.tableRowLast : styles.tableRow}>
+                    <Text style={[styles.td, { width: "5%", color: "#888" }]}></Text>
+                    <Text style={[styles.td, { width: "12%", fontFamily: "Helvetica-Bold", color: "#0ea5e9" }]}>{m.momento}</Text>
+                    <Text style={[styles.td, { width: "10%", color: "#888" }]}>{m.duracion}</Text>
+                    <Text style={[styles.td, { width: "20%", color: "#374151" }]}>{m.meta_aprendizaje ?? ""}</Text>
+                    <Text style={[styles.td, { flex: 1, color: "#374151" }]}>{m.actividad}</Text>
+                    <Text style={[styles.td, { width: "15%", color: "#666" }]}>{m.recursos}</Text>
+                  </View>
                 ))}
+                {/* Formato legacy: plan_aprendizaje */}
+                {!isNew && (
+                  <View style={isLast ? styles.tableRowLast : styles.tableRow}>
+                    <Text style={[styles.td, { width: "5%" }]}></Text>
+                    <Text style={[styles.td, { width: "15%", color: "#555" }]}>{act.recorte ?? ""}</Text>
+                    <Text style={[styles.td, { width: "20%", color: "#374151" }]}>{act.meta_aprendizaje ?? ""}</Text>
+                    <View style={[styles.td, { flex: 1 }]}>
+                      {(act.plan_aprendizaje ?? []).map((paso, j) => (
+                        <Text key={j} style={styles.planStep}>- {paso}</Text>
+                      ))}
+                    </View>
+                    <Text style={[styles.td, { width: "15%", color: "#666" }]}>{act.recursos ?? ""}</Text>
+                  </View>
+                )}
               </View>
-              <Text style={[styles.td, styles.colRecursos, { color: "#666" }]}>{act.recursos ?? ""}</Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
       </Page>
     </Document>

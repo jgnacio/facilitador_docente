@@ -36,6 +36,14 @@ type Momento = {
 };
 
 type SecuenciaActividad = {
+  // Nuevo formato
+  titulo?: string;
+  metodologia?: string;
+  momentos?: Momento[];
+  ce_codigo?: string;
+  ce_texto?: string;
+  criterio_de_logro?: string;
+  // Formato legacy
   numero?: number;
   recorte?: string;
   meta_aprendizaje?: string;
@@ -623,24 +631,50 @@ function MomentoField({ label, value, onSurface, onSurfaceVariant }: {
 function SubActividadCard({ actividad, onSurface, onSurfaceVariant, primaryColor }: {
   actividad: SecuenciaActividad; onSurface: string; onSurfaceVariant: string; primaryColor: string;
 }) {
+  const isNew = Array.isArray(actividad.momentos) && actividad.momentos.length > 0;
   return (
     <div style={{ background: "var(--surface)", borderRadius: "1.25rem", padding: "1.25rem 1.5rem", border: "1px solid rgba(127,127,127,0.08)" }}>
       <div className="flex items-center gap-3 mb-3">
-        {actividad.numero !== undefined && (
+        {!isNew && actividad.numero !== undefined && (
           <div style={{ width: "30px", height: "30px", borderRadius: "0.6rem", flexShrink: 0, background: "rgba(0,0,0,0.04)", display: "flex", alignItems: "center", justifyContent: "center", color: onSurfaceVariant, fontSize: "0.75rem", fontWeight: 700, fontFamily: "var(--font-dm-sans)" }}>
             {actividad.numero}
           </div>
         )}
         <p style={{ fontWeight: 700, fontSize: "0.9rem", fontFamily: "var(--font-dm-sans)", color: onSurface, flex: 1, minWidth: 0 }}>
-          {actividad.recorte}
+          {isNew ? (actividad.titulo ?? "") : (actividad.recorte ?? "")}
         </p>
+        {isNew && actividad.metodologia && (
+          <span style={{ fontSize: "0.7rem", fontWeight: 700, padding: "0.2rem 0.6rem", borderRadius: "999px", background: `color-mix(in srgb, ${primaryColor} 12%, transparent)`, color: primaryColor, fontFamily: "var(--font-dm-sans)", flexShrink: 0 }}>
+            {actividad.metodologia}
+          </span>
+        )}
       </div>
 
-      {actividad.meta_aprendizaje && (
+      {/* Nuevo formato: tabla de momentos */}
+      {isNew && (
+        <div className="flex flex-col gap-2 mt-2">
+          {actividad.momentos!.map((m, i) => (
+            <div key={i} style={{ background: "rgba(0,0,0,0.02)", borderRadius: "0.75rem", padding: "0.75rem 1rem" }}>
+              <div className="flex items-center gap-2 mb-1">
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", padding: "0.15rem 0.5rem", borderRadius: "999px", background: `color-mix(in srgb, ${primaryColor} 10%, transparent)`, color: primaryColor, fontFamily: "var(--font-dm-sans)" }}>
+                  {m.momento}
+                </span>
+                <span style={{ fontSize: "0.72rem", color: onSurfaceVariant, fontFamily: "var(--font-dm-sans)" }}>{m.duracion}</span>
+              </div>
+              {m.meta_aprendizaje && <p style={{ fontSize: "0.78rem", fontWeight: 600, color: onSurface, fontFamily: "var(--font-dm-sans)", marginBottom: "0.25rem" }}>{m.meta_aprendizaje}</p>}
+              <p style={{ fontSize: "0.8rem", color: onSurfaceVariant, fontFamily: "var(--font-dm-sans)", lineHeight: 1.5 }}>{m.actividad}</p>
+              {m.recursos && <p style={{ fontSize: "0.72rem", color: onSurfaceVariant, fontFamily: "var(--font-dm-sans)", marginTop: "0.25rem", opacity: 0.7 }}>📎 {m.recursos}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Formato legacy */}
+      {!isNew && actividad.meta_aprendizaje && (
         <MomentoField label="Meta" value={actividad.meta_aprendizaje} onSurface={onSurface} onSurfaceVariant={onSurfaceVariant} />
       )}
 
-      {actividad.plan_aprendizaje && actividad.plan_aprendizaje.length > 0 && (
+      {!isNew && actividad.plan_aprendizaje && actividad.plan_aprendizaje.length > 0 && (
         <div className="mt-2.5">
           <p style={{ fontSize: "0.68rem", fontWeight: 700, color: onSurfaceVariant, textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: "var(--font-dm-sans)", opacity: 0.7, marginBottom: "0.5rem" }}>
             Plan de aprendizaje
@@ -655,7 +689,7 @@ function SubActividadCard({ actividad, onSurface, onSurfaceVariant, primaryColor
         </div>
       )}
 
-      {actividad.recursos && (
+      {!isNew && actividad.recursos && (
         <div className="mt-2.5">
           <MomentoField label="Recursos" value={actividad.recursos} onSurface={onSurface} onSurfaceVariant={onSurfaceVariant} />
         </div>

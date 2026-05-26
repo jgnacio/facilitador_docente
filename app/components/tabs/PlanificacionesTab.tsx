@@ -50,10 +50,18 @@ type PlanEstructurada = {
 };
 
 type SecuenciaActividad = {
-  numero: number;
-  recorte: string;
-  meta_aprendizaje: string;
-  plan_aprendizaje: string[];
+  // Nuevo formato
+  titulo?: string;
+  metodologia?: string;
+  momentos?: PlanMomento[];
+  ce_codigo?: string;
+  ce_texto?: string;
+  criterio_de_logro?: string;
+  // Formato legacy
+  numero?: number;
+  recorte?: string;
+  meta_aprendizaje?: string;
+  plan_aprendizaje?: string[];
   recursos?: string;
 };
 
@@ -416,17 +424,28 @@ function SecuenciaTabla({ data, nombre }: { data: SecuenciaEstructurada; nombre:
 
   const exportCSV = () => {
     const bom = "\uFEFF";
-    const headers = ["N°", "Recorte", "Meta de aprendizaje", "Plan de aprendizaje", "Recursos"];
-    const rows = data.actividades.map((a) => [
-      String(a.numero),
-      a.recorte,
-      a.meta_aprendizaje,
-      a.plan_aprendizaje.join("\n"),
-      a.recursos ?? "",
-    ]);
-    const csv = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+    const isNew = data.actividades.some((a) => Array.isArray(a.momentos) && a.momentos.length > 0);
+    let csv: string;
+    if (isNew) {
+      const headers = ["N°", "Título", "Metodología", "Momento", "Duración", "Meta aprendizaje", "Actividad", "Rol docente", "Recursos"];
+      const rows: string[][] = [];
+      data.actividades.forEach((act, idx) => {
+        (act.momentos ?? []).forEach((m) => {
+          rows.push([String(idx + 1), act.titulo ?? "", act.metodologia ?? "", m.momento, m.duracion, m.meta_aprendizaje ?? "", m.actividad, m.rol_docente, m.recursos]);
+        });
+      });
+      csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    } else {
+      const headers = ["N°", "Recorte", "Meta de aprendizaje", "Plan de aprendizaje", "Recursos"];
+      const rows = data.actividades.map((a) => [
+        String(a.numero ?? ""),
+        a.recorte ?? "",
+        a.meta_aprendizaje ?? "",
+        (a.plan_aprendizaje ?? []).join("\n"),
+        a.recursos ?? "",
+      ]);
+      csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    }
     const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -519,41 +538,86 @@ function SecuenciaTabla({ data, nombre }: { data: SecuenciaEstructurada; nombre:
         )}
       </div>
 
-      {/* Tabla de actividades */}
-      <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-xs border-collapse min-w-[600px] border border-border rounded-xl overflow-hidden">
-          <thead>
-            <tr className="bg-muted/50">
-              {["ACT.", "RECORTE", "META DE APRENDIZAJE", "PLAN DE APRENDIZAJE", "RECURSOS"].map((h) => (
-                <th key={h} className="text-left py-2 px-3 font-semibold text-muted-foreground uppercase tracking-wide border-b border-border whitespace-nowrap">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.actividades.map((act, i) => (
-              <tr key={i} className="border-b border-border/40 align-top">
-                <td className="py-3 px-3 font-bold text-foreground whitespace-nowrap">{act.numero}.</td>
-                <td className="py-3 px-3 text-foreground/80 leading-relaxed min-w-[120px]">{act.recorte}</td>
-                <td className="py-3 px-3 text-foreground/80 leading-relaxed min-w-[160px]">{act.meta_aprendizaje}</td>
-                <td className="py-3 px-3 leading-relaxed min-w-[240px]">
-                  <ul className="space-y-1">
-                    {act.plan_aprendizaje.map((paso, j) => (
-                      <li key={j} className="flex gap-2 text-foreground/80">
-                        <span className="text-muted-foreground shrink-0">-</span>
-                        <span>{paso}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </td>
-                <td className="py-3 px-3 text-muted-foreground leading-relaxed min-w-[100px]">
-                  {act.recursos || <span className="text-muted-foreground/30">—</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Actividades */}
+      <div className="space-y-3">
+        {data.actividades.map((act, i) => {
+          const isNewFormat = Array.isArray(act.momentos) && act.momentos.length > 0;
+          const momentoColor: Record<string, string> = {
+            Inicio:     "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+            Desarrollo: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+            Cierre:     "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
+          };
+          return (
+            <div key={i} className="rounded-xl border border-border overflow-hidden text-xs">
+              <div className="flex items-start gap-3 px-3 py-2.5 border-b border-border bg-muted/30">
+                <span className="font-bold text-foreground shrink-0">
+                  {isNewFormat ? `${i + 1}.` : `${act.numero ?? i + 1}.`}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-foreground leading-snug">
+                    {isNewFormat ? (act.titulo ?? "") : (act.recorte ?? "")}
+                  </p>
+                  {isNewFormat && act.metodologia && (
+                    <span className="inline-block mt-1 px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider bg-accent/10 text-accent">
+                      {act.metodologia}
+                    </span>
+                  )}
+                  {!isNewFormat && act.meta_aprendizaje && (
+                    <p className="text-foreground/70 mt-0.5 leading-relaxed">{act.meta_aprendizaje}</p>
+                  )}
+                </div>
+              </div>
+
+              {isNewFormat && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse min-w-[480px]">
+                    <thead>
+                      <tr className="border-b border-border">
+                        {["Momento", "Dur.", "Meta", "Actividad", "Rol docente", "Recursos"].map((h) => (
+                          <th key={h} className="text-left py-2 px-3 font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {act.momentos!.map((m, j) => (
+                        <tr key={j} className="border-b border-border/40 align-top last:border-0">
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded-full font-medium text-xs ${momentoColor[m.momento] ?? "bg-muted text-foreground"}`}>
+                              {m.momento}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap">{m.duracion}</td>
+                          <td className="py-2.5 px-3 leading-relaxed font-medium text-foreground/90">{m.meta_aprendizaje ?? <span className="text-muted-foreground/40 italic">—</span>}</td>
+                          <td className="py-2.5 px-3 leading-relaxed">{m.actividad}</td>
+                          <td className="py-2.5 px-3 leading-relaxed text-muted-foreground">{m.rol_docente}</td>
+                          <td className="py-2.5 px-3 leading-relaxed text-muted-foreground">{m.recursos}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {!isNewFormat && Array.isArray(act.plan_aprendizaje) && act.plan_aprendizaje.length > 0 && (
+                <ul className="px-3 py-2.5 space-y-1">
+                  {act.plan_aprendizaje.map((paso, j) => (
+                    <li key={j} className="flex gap-2 text-foreground/80">
+                      <span className="text-muted-foreground shrink-0">–</span>
+                      <span>{paso}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {isNewFormat && (act.ce_codigo || act.criterio_de_logro) && (
+                <div className="px-3 py-2 space-y-0.5 border-t border-border bg-muted/20">
+                  {act.ce_codigo && <p><strong>{act.ce_codigo}</strong>{act.ce_texto ? ` — ${act.ce_texto}` : ""}</p>}
+                  {act.criterio_de_logro && <p className="text-muted-foreground"><strong className="text-foreground">Criterio:</strong> {act.criterio_de_logro}</p>}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Card>
   );

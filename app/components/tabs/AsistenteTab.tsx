@@ -29,8 +29,16 @@ type PlanificacionMomento = {
   actividad: string; rol_docente: string; recursos: string;
 };
 type SecuenciaActividad = {
-  numero: number; recorte: string; meta_aprendizaje: string;
-  plan_aprendizaje: string[]; recursos?: string;
+  // Nuevo formato (PlanificacionTable con momentos)
+  titulo?: string; grupo?: string; justificacion?: string;
+  metodologia?: string; metodologia_descripcion?: string;
+  momentos?: PlanificacionMomento[];
+  ce_codigo?: string; ce_texto?: string; contenido?: string;
+  criterio_de_logro?: string; espacio?: string; unidad?: string;
+  tramo?: number; competencias_mcn?: string[];
+  // Formato legacy
+  numero?: number; recorte?: string; meta_aprendizaje?: string;
+  plan_aprendizaje?: string[]; recursos?: string;
 };
 type SecuenciaData = {
   espacio: string; unidad_curricular: string;
@@ -229,7 +237,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
     setStatusLabel("Pensando…");
     setStreamingText("");
 
-    // Prepend context to first message only — invisible in UI, visible al agente
+    // Prepend context to first message only — invisible en UI, visible al agente
     let agentMessage = t;
     if (contextMessage && !contextUsed.current) {
       contextUsed.current = true;
@@ -372,7 +380,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
         }}
       >
         <div className="flex items-center gap-3">
-       
+
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -466,7 +474,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
             </motion.div>
           )}
         </AnimatePresence>
-        
+
         {loadingHistory && (
           <div className="flex justify-center py-6" style={{ color: "var(--on-surface-variant)" }}>
             <span className="text-sm animate-pulse">Cargando conversación…</span>
@@ -528,7 +536,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
           />
           <div className="flex items-center justify-between px-2 pb-1">
             <div className="flex items-center gap-1">
-              <Button 
+              <Button
                 isIconOnly
                 variant="ghost"
                 isDisabled
@@ -537,7 +545,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
               >
                 <Plus size={20} />
               </Button>
-              <Button 
+              <Button
                 isIconOnly
                 variant="ghost"
                 isDisabled
@@ -549,7 +557,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
             </div>
 
             <div className="flex items-center gap-2">
-              <Button 
+              <Button
                 isIconOnly
                 variant="ghost"
                 isDisabled
@@ -575,7 +583,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
 
         </motion.div>
 
-        
+
         <AnimatePresence>
           {messages.length === 0 && (
             <motion.div
@@ -590,7 +598,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
                   onClick={() => send(q.label)}
                   disabled={!sessionReady}
                   className="flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all active:scale-95 text-xs font-medium"
-                  style={{ 
+                  style={{
                     color: "var(--on-surface-variant)",
                     background: "transparent",
                     borderColor: "rgba(120, 120, 120, 0.15)"
@@ -626,7 +634,7 @@ const WelcomeScreen = memo(({
   useEffect(() => {
     setMounted(true);
   }, []);
-  
+
   return (
     <div className="flex flex-col items-center justify-center flex-1 gap-4 py-8 px-2">
       <div className="flex flex-col items-center gap-2 text-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
@@ -905,7 +913,7 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
     URL.revokeObjectURL(url);
   };
   const exportCSV = () => {
-    const bom = "\uFEFF";
+    const bom = "﻿";
     const headers = ["Momento", "Duración", "Actividad", "Rol docente", "Recursos"];
     const rows = data.momentos.map((m) => [m.momento, m.duracion, m.actividad, m.rol_docente, m.recursos]);
     const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -988,6 +996,12 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
 
 // ── SecuenciaTablaInline ──────────────────────────────────────────────────────
 
+const secuenciaMomentoColor: Record<string, { bg: string; text: string }> = {
+  Inicio:     { bg: "var(--tertiary-subtle)", text: "var(--tertiary)" },
+  Desarrollo: { bg: "rgba(22, 163, 74, 0.1)", text: "var(--success)" },
+  Cierre:     { bg: "var(--primary-subtle)", text: "var(--primary)" },
+};
+
 function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
   const handleExportPDF = async () => {
     const titulo = `${data.espacio} — ${data.unidad_curricular}`;
@@ -999,23 +1013,40 @@ function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
     a.href = url; a.download = `${titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`; a.click();
     URL.revokeObjectURL(url);
   };
+
   const exportCSV = () => {
-    const bom = "\uFEFF";
-    const headers = ["N°", "Recorte", "Meta de aprendizaje", "Plan de aprendizaje", "Recursos"];
-    const rows = data.actividades.map((a) => [String(a.numero), a.recorte, a.meta_aprendizaje, a.plan_aprendizaje.join("\n"), a.recursos ?? ""]);
-    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const bom = "﻿";
+    const isNew = data.actividades.some((a) => Array.isArray(a.momentos) && a.momentos.length > 0);
+    let csv: string;
+    if (isNew) {
+      const headers = ["N°", "Título", "Metodología", "Momento", "Duración", "Meta aprendizaje", "Actividad", "Rol docente", "Recursos"];
+      const rows: string[][] = [];
+      data.actividades.forEach((act, idx) => {
+        (act.momentos ?? []).forEach((m) => {
+          rows.push([String(idx + 1), act.titulo ?? "", act.metodologia ?? "", m.momento, m.duracion, m.meta_aprendizaje ?? "", m.actividad, m.rol_docente, m.recursos]);
+        });
+      });
+      csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    } else {
+      const headers = ["N°", "Recorte", "Meta de aprendizaje", "Plan de aprendizaje", "Recursos"];
+      const rows = data.actividades.map((a) => [String(a.numero ?? ""), a.recorte ?? "", a.meta_aprendizaje ?? "", (a.plan_aprendizaje ?? []).join("\n"), a.recursos ?? ""]);
+      csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    }
     const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = "secuencia.csv"; a.click();
     URL.revokeObjectURL(url);
   };
+
   return (
     <Card variant="secondary" className="p-4 rounded-2xl space-y-4 w-full">
       <div className="flex justify-end gap-2">
         <ExportBtn onClick={exportCSV} label="Excel" icon={<ExportIcon />} />
         <ExportBtn onClick={handleExportPDF} label="PDF" icon={<PdfIcon />} />
       </div>
+
+      {/* Header curricular */}
       <div className="rounded-xl border border-border overflow-hidden text-xs">
         <div className="grid grid-cols-2 border-b border-border">
           <div className="px-3 py-2 border-r border-border">
@@ -1040,37 +1071,91 @@ function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
           </div>
         )}
       </div>
-      <div className="overflow-x-auto -mx-1">
-        <table className="w-full text-xs border-collapse min-w-[600px] border border-border rounded-xl overflow-hidden">
-          <thead>
-            <tr className="bg-muted/50">
-              {["ACT.", "RECORTE", "META DE APRENDIZAJE", "PLAN DE APRENDIZAJE", "RECURSOS"].map((h) => (
-                <th key={h} className="text-left py-2 px-3 font-semibold text-muted-foreground uppercase tracking-wide border-b border-border whitespace-nowrap" style={{ fontFamily: "var(--font-display)" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.actividades.map((act, i) => (
-              <tr key={i} className="border-b border-border/40 align-top">
-                <td className="py-3 px-3 font-bold text-foreground whitespace-nowrap" style={{ fontFamily: "var(--font-display)" }}>{act.numero}.</td>
-                <td className="py-3 px-3 text-foreground/80 leading-relaxed min-w-[120px]" style={{ fontFamily: "var(--font-body)" }}>{act.recorte}</td>
-                <td className="py-3 px-3 text-foreground/80 leading-relaxed min-w-[160px]" style={{ fontFamily: "var(--font-body)" }}>{act.meta_aprendizaje}</td>
-                <td className="py-3 px-3 leading-relaxed min-w-[240px]">
-                  <ul className="space-y-1">
-                    {act.plan_aprendizaje.map((paso, j) => (
-                      <li key={j} className="flex gap-2 text-foreground/80" style={{ fontFamily: "var(--font-body)" }}>
-                        <span className="text-muted-foreground shrink-0">–</span><span>{paso}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </td>
-                <td className="py-3 px-3 text-muted-foreground leading-relaxed min-w-[100px]" style={{ fontFamily: "var(--font-body)" }}>
-                  {act.recursos || <span className="opacity-30">—</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      {/* Actividades */}
+      <div className="space-y-4">
+        {data.actividades.map((act, i) => {
+          const isNewFormat = Array.isArray(act.momentos) && act.momentos.length > 0;
+          return (
+            <div key={i} className="rounded-xl border border-border overflow-hidden text-xs">
+              {/* Activity header */}
+              <div className="flex items-start gap-3 px-3 py-2.5 border-b border-border" style={{ background: "var(--surface-container-low)" }}>
+                <span className="font-bold text-foreground shrink-0" style={{ fontFamily: "var(--font-display)" }}>
+                  {isNewFormat ? `${i + 1}.` : `${act.numero ?? i + 1}.`}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-foreground leading-snug" style={{ fontFamily: "var(--font-display)" }}>
+                    {isNewFormat ? (act.titulo ?? "") : (act.recorte ?? "")}
+                  </p>
+                  {isNewFormat && act.metodologia && (
+                    <span
+                      className="inline-block mt-1 px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider"
+                      style={{ background: "var(--primary-subtle)", color: "var(--primary)", fontFamily: "var(--font-display)" }}
+                    >
+                      {act.metodologia}
+                    </span>
+                  )}
+                  {!isNewFormat && act.meta_aprendizaje && (
+                    <p className="text-foreground/70 mt-0.5 leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{act.meta_aprendizaje}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Nuevo formato: tabla de momentos */}
+              {isNewFormat && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse min-w-[480px]">
+                    <thead>
+                      <tr className="border-b border-border">
+                        {["Momento", "Dur.", "Meta", "Actividad", "Rol docente", "Recursos"].map((h) => (
+                          <th key={h} className="text-left py-2 px-3 font-semibold text-muted-foreground whitespace-nowrap" style={{ fontFamily: "var(--font-display)" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {act.momentos!.map((m, j) => {
+                        const colors = secuenciaMomentoColor[m.momento] || { bg: "var(--surface-container-low)", text: "var(--on-surface)" };
+                        return (
+                          <tr key={j} className="border-b border-border/40 align-top last:border-0">
+                            <td className="py-2.5 px-3 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider" style={{ background: colors.bg, color: colors.text, fontFamily: "var(--font-display)" }}>
+                                {m.momento}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-muted-foreground whitespace-nowrap" style={{ fontFamily: "var(--font-body)" }}>{m.duracion}</td>
+                            <td className="py-2.5 px-3 leading-relaxed text-foreground/80" style={{ fontFamily: "var(--font-body)" }}>{m.meta_aprendizaje ?? <span className="opacity-30">—</span>}</td>
+                            <td className="py-2.5 px-3 leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{m.actividad}</td>
+                            <td className="py-2.5 px-3 leading-relaxed text-muted-foreground" style={{ fontFamily: "var(--font-body)" }}>{m.rol_docente}</td>
+                            <td className="py-2.5 px-3 leading-relaxed text-muted-foreground" style={{ fontFamily: "var(--font-body)" }}>{m.recursos}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Formato legacy: bullets de plan_aprendizaje */}
+              {!isNewFormat && Array.isArray(act.plan_aprendizaje) && act.plan_aprendizaje.length > 0 && (
+                <ul className="px-3 py-2.5 space-y-1">
+                  {act.plan_aprendizaje.map((paso, j) => (
+                    <li key={j} className="flex gap-2 text-foreground/80" style={{ fontFamily: "var(--font-body)" }}>
+                      <span className="text-muted-foreground shrink-0">–</span><span>{paso}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {/* Footer nuevo formato: CE + criterio */}
+              {isNewFormat && (act.ce_codigo || act.criterio_de_logro) && (
+                <div className="px-3 py-2 space-y-0.5 border-t border-border" style={{ background: "var(--surface-container-lowest)" }}>
+                  {act.ce_codigo && <p style={{ fontFamily: "var(--font-body)", fontSize: "0.7rem" }}><strong style={{ fontFamily: "var(--font-display)" }}>{act.ce_codigo}</strong>{act.ce_texto ? ` — ${act.ce_texto}` : ""}</p>}
+                  {act.criterio_de_logro && <p className="text-muted-foreground" style={{ fontFamily: "var(--font-body)", fontSize: "0.7rem" }}><strong className="text-foreground" style={{ fontFamily: "var(--font-display)" }}>Criterio:</strong> {act.criterio_de_logro}</p>}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Card>
   );
@@ -1154,18 +1239,18 @@ function HoneycombLoader({ label }: { label: string }) {
   };
 
   const hash = getHash(label);
-  
+
   // Rule: "Pensando..." is ALWAYS brand orange
   const isThinking = label.toLowerCase().includes("pensando");
-  
-  // Calculate dynamic color: 
+
+  // Calculate dynamic color:
   // If thinking, use brand orange.
   // Otherwise, generate a "tint" of the brand orange (Hue around 28)
   const hue = isThinking ? 28 : (20 + (hash % 25)); // Stay between 20 and 45 (Orange/Amber)
   const saturation = isThinking ? 96 : (70 + (hash % 25));
   const lightness = isThinking ? 48 : (50 + (hash % 15));
   const dynamicColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-  
+
   // Available patterns
   const patterns = ["wave", "spiral", "pulse", "zigzag", "random", "alternate"];
   const pattern = isThinking ? "random" : patterns[hash % patterns.length];
@@ -1197,7 +1282,7 @@ function HoneycombLoader({ label }: { label: string }) {
               d={`M${h.x + 4} ${h.y}L${h.x + 7.46} ${h.y + 2}V${h.y + 6}L${h.x + 4} ${h.y + 8}L${h.x + 0.54} ${h.y + 6}V${h.y + 2}L${h.x + 4} ${h.y}Z`}
               fill={dynamicColor}
               initial={{ opacity: 0.1, scale: 0.5 }}
-              animate={{ 
+              animate={{
                 opacity: [0.1, 1, 0.1],
                 scale: [0.8, 1.2, 0.8],
               }}
@@ -1223,9 +1308,9 @@ function TypingIndicator({ label, surfaceLow, onVariant }: { label: string; surf
     <div className="flex justify-start">
       <div
         className="rounded-2xl rounded-bl-sm flex items-center gap-3"
-        style={{ 
-          background: surfaceLow, 
-          padding: "0.75rem 1.25rem", 
+        style={{
+          background: surfaceLow,
+          padding: "0.75rem 1.25rem",
           boxShadow: shadow,
           border: "1px solid rgba(127,127,127,0.1)"
         }}
