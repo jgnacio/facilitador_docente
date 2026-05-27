@@ -18,6 +18,7 @@ import {
   type Activity,
 } from "@/app/api-actions";
 import { ActivityCard } from "@/app/components/cards";
+import { AlumnosPanel } from "@/app/components/AlumnosPanel";
 import { useConfirmModal, RenameModal } from "@/app/components/ui/confirm-modal";
 
 function formatDate(dateStr?: string): string {
@@ -247,6 +248,14 @@ export default function SequenceDetailPage() {
         onCancel={() => setRenamingActId(null)}
       />
     )}
+    {/* Panel fijo — solo pantallas ≥1845px */}
+    <aside
+      className="hidden min-[1845px]:block"
+      style={{ position: "fixed", top: "80px", left: "max(1rem, calc(50vw - 550px - 356px))", width: "340px", maxHeight: "calc(100vh - 96px)", overflowY: "auto", zIndex: 10 }}
+    >
+      <AlumnosPanel groupId={groupId} groupName={group?.name} />
+    </aside>
+
     <div style={{ padding: "2rem 2.5rem", maxWidth: "1100px", margin: "0 auto" }}>
       {/* ── Breadcrumb ───────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 mb-6 flex-wrap" style={{ fontSize: "0.82rem", fontFamily: "var(--font-dm-sans)", color: onSurfaceVariant }}>
@@ -357,6 +366,9 @@ export default function SequenceDetailPage() {
           )}
         </>
       )}
+
+      {/* Panel inline — pantallas menores a 1845px */}
+      <div className="min-[1845px]:hidden mb-6"><AlumnosPanel groupId={groupId} groupName={group?.name} defaultCollapsed /></div>
 
       {/* ── Activities ───────────────────────────────────────────────────────── */}
       <div>
