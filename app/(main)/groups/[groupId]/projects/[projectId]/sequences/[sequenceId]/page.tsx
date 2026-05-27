@@ -268,86 +268,94 @@ export default function SequenceDetailPage() {
       </div>
 
       {/* ── Sequence header ──────────────────────────────────────────────────── */}
-      {loadingSeq ? (
-        <div className="flex justify-center py-4">
-          <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{color: "var(--warning, #f59e0b)"}}>
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-        </div>
-      ) : sequence ? (
-        editingSeq ? (
-          <div style={{ background: "var(--surface-container-low)", borderRadius: "1.5rem", padding: "1.75rem", marginBottom: "2rem", boxShadow: "var(--shadow-ambient)", border: "1px solid rgba(127,127,127,0.1)" }}>
-            <p style={{ fontWeight: 700, fontSize: "1rem", fontFamily: "var(--font-dm-sans)", color: onSurface, marginBottom: "1.25rem" }}>Editar secuencia</p>
-            <div className="grid gap-4">
+      {editingSeq ? (
+        <div style={{ background: "var(--surface-container-low)", borderRadius: "1.5rem", padding: "1.75rem", marginBottom: "2rem", boxShadow: "var(--shadow-ambient)", border: "1px solid rgba(127,127,127,0.1)" }}>
+          <p style={{ fontWeight: 700, fontSize: "1rem", fontFamily: "var(--font-dm-sans)", color: onSurface, marginBottom: "1.25rem" }}>Editar secuencia</p>
+          <div className="grid gap-4">
+            <div>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: onSurfaceVariant, marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>
+                Nombre <span style={{ color: "var(--danger)" }}>*</span>
+              </label>
+              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} style={inputStyle(false, onSurface)} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: onSurfaceVariant, marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>Meta de aprendizaje</label>
+              <input type="text" value={editGoal} onChange={(e) => setEditGoal(e.target.value)} style={inputStyle(false, onSurface)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: onSurfaceVariant, marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>
-                  Nombre <span style={{ color: "var(--danger)" }}>*</span>
-                </label>
-                <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} style={inputStyle(false, onSurface)} />
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: onSurfaceVariant, marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>Fecha inicio</label>
+                <input type="date" value={editStart} onChange={(e) => setEditStart(e.target.value)} style={inputStyle(false, onSurface)} />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: onSurfaceVariant, marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>Meta de aprendizaje</label>
-                <input type="text" value={editGoal} onChange={(e) => setEditGoal(e.target.value)} style={inputStyle(false, onSurface)} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: onSurfaceVariant, marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>Fecha inicio</label>
-                  <input type="date" value={editStart} onChange={(e) => setEditStart(e.target.value)} style={inputStyle(false, onSurface)} />
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: onSurfaceVariant, marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>Fecha fin</label>
-                  <input type="date" value={editEnd} onChange={(e) => setEditEnd(e.target.value)} style={inputStyle(false, onSurface)} />
-                </div>
-              </div>
-              {editSeqError && <p style={{ fontSize: "0.8rem", color: "var(--danger)", fontFamily: "var(--font-dm-sans)" }}>{editSeqError}</p>}
-              <div className="flex gap-3 justify-end pt-1">
-                <button onClick={() => setEditingSeq(false)} style={{ padding: "0.625rem 1.25rem", borderRadius: "0.875rem", border: "1.5px solid var(--outline-variant)", background: "transparent", color: onSurfaceVariant, fontSize: "0.875rem", fontWeight: 600, fontFamily: "var(--font-dm-sans)", cursor: "pointer" }}>
-                  <span className="flex items-center gap-1.5"><X size={13} /> Cancelar</span>
-                </button>
-                <button onClick={handleSaveSeq} disabled={updateSeqMutation.isPending} className="flex items-center gap-2 transition-all active:scale-95" style={{ padding: "0.625rem 1.5rem", borderRadius: "0.875rem", border: "none", background: primaryColor, color: "#ffffff", fontSize: "0.875rem", fontWeight: 700, fontFamily: "var(--font-fraunces)", cursor: "pointer", opacity: updateSeqMutation.isPending ? 0.7 : 1 }}>
-                  {updateSeqMutation.isPending ? <><Spinner size="sm" color="current" /> Guardando…</> : <><Check size={14} /> Guardar</>}
-                </button>
+                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: onSurfaceVariant, marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>Fecha fin</label>
+                <input type="date" value={editEnd} onChange={(e) => setEditEnd(e.target.value)} style={inputStyle(false, onSurface)} />
               </div>
             </div>
+            {editSeqError && <p style={{ fontSize: "0.8rem", color: "var(--danger)", fontFamily: "var(--font-dm-sans)" }}>{editSeqError}</p>}
+            <div className="flex gap-3 justify-end pt-1">
+              <button onClick={() => setEditingSeq(false)} style={{ padding: "0.625rem 1.25rem", borderRadius: "0.875rem", border: "1.5px solid var(--outline-variant)", background: "transparent", color: onSurfaceVariant, fontSize: "0.875rem", fontWeight: 600, fontFamily: "var(--font-dm-sans)", cursor: "pointer" }}>
+                <span className="flex items-center gap-1.5"><X size={13} /> Cancelar</span>
+              </button>
+              <button onClick={handleSaveSeq} disabled={updateSeqMutation.isPending} className="flex items-center gap-2 transition-all active:scale-95" style={{ padding: "0.625rem 1.5rem", borderRadius: "0.875rem", border: "none", background: primaryColor, color: "#ffffff", fontSize: "0.875rem", fontWeight: 700, fontFamily: "var(--font-fraunces)", cursor: "pointer", opacity: updateSeqMutation.isPending ? 0.7 : 1 }}>
+                {updateSeqMutation.isPending ? <><Spinner size="sm" color="current" /> Guardando…</> : <><Check size={14} /> Guardar</>}
+              </button>
+            </div>
           </div>
-        ) : (
-          <div style={{ background: "var(--surface-container-low)", borderRadius: "1.5rem", padding: "1.75rem", marginBottom: "2rem", boxShadow: "var(--shadow-ambient)", border: "1px solid rgba(127,127,127,0.08)" }}>
-            <div className="flex items-start justify-between gap-3">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: "0.72rem", fontWeight: 700, color: primaryColor, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-fraunces)", marginBottom: "0.5rem" }}>
-                  Secuencia {sequence.order}
-                </p>
-                <h1 style={{ fontSize: "1.75rem", fontWeight: 400, fontFamily: "var(--font-fraunces)", color: onSurface, letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: sequence.learning_goal ? "0.75rem" : "0" }}>
-                  {sequence.name}
-                </h1>
-                {sequence.learning_goal && (
-                  <p style={{ fontSize: "0.9rem", color: onSurfaceVariant, fontFamily: "var(--font-dm-sans)", marginBottom: "0.5rem" }}>
-                    {sequence.learning_goal}
-                  </p>
-                )}
-                {(sequence.start_date || sequence.end_date) && (
-                  <div className="flex items-center gap-1.5" style={{ color: onSurfaceVariant, opacity: 0.6 }}>
-                    <Calendar size={13} />
-                    <span style={{ fontSize: "0.78rem", fontFamily: "var(--font-dm-sans)" }}>
-                      {[formatDate(sequence.start_date), formatDate(sequence.end_date)].filter(Boolean).join(" → ")}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button onClick={openEditSeq} className="flex items-center justify-center transition-all hover:opacity-80" title="Editar secuencia" style={{ width: "34px", height: "34px", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "transparent", color: onSurfaceVariant, cursor: "pointer" }}>
-                  <Pencil size={14} />
+        </div>
+      ) : (
+        <>
+          {/* Title row */}
+          <div className="flex items-start justify-between gap-4" style={{ marginBottom: "0.75rem" }}>
+            <h1 style={{ fontSize: "2rem", fontWeight: 400, fontFamily: "var(--font-fraunces)", color: onSurface, letterSpacing: "-0.03em", lineHeight: 1.2 }}>
+              {loadingSeq
+                ? <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: "var(--warning, #f59e0b)" }}><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                : (sequence?.name ?? "Secuencia")}
+            </h1>
+            {sequence && (
+              <div className="flex items-center gap-2 flex-shrink-0 pt-1">
+                <button onClick={openEditSeq} className="flex items-center gap-1.5 transition-all hover:opacity-80 active:scale-95" style={{ padding: "0.4rem 0.875rem", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "transparent", color: onSurfaceVariant, fontSize: "0.8rem", fontWeight: 600, fontFamily: "var(--font-dm-sans)", cursor: "pointer" }}>
+                  <Pencil size={13} /> Editar
                 </button>
                 <button onClick={handleDeleteSequence} disabled={deleteSeqMutation.isPending} className="flex items-center justify-center transition-all hover:opacity-80" title="Eliminar secuencia" style={{ width: "34px", height: "34px", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "transparent", color: "var(--danger)", cursor: "pointer", opacity: deleteSeqMutation.isPending ? 0.5 : 1 }}>
                   {deleteSeqMutation.isPending ? <Spinner size="sm" color="current" /> : <Trash2 size={14} />}
                 </button>
               </div>
-            </div>
+            )}
           </div>
-        )
-      ) : (
-        <p style={{ color: onSurfaceVariant, marginBottom: "2rem" }}>Secuencia no encontrada.</p>
+
+          {/* Meta chips */}
+          {!loadingSeq && sequence && (
+            <div className="flex flex-wrap items-center gap-2 mb-6" style={{ fontFamily: "var(--font-dm-sans)" }}>
+              {project && (
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: "var(--surface-container-low)", color: onSurfaceVariant }}>
+                  {project.name}
+                </span>
+              )}
+              {group && (
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: "var(--surface-container-low)", color: onSurfaceVariant }}>
+                  {group.name} · {group.stage} · Nivel {group.level}
+                </span>
+              )}
+              {project?.duration_weeks && (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: "var(--primary-subtle)", color: "var(--primary)" }}>
+                  {project.duration_weeks} semanas
+                </span>
+              )}
+              {(sequence.start_date || sequence.end_date) && (
+                <span className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full" style={{ background: "var(--surface-container-low)", color: onSurfaceVariant }}>
+                  <Calendar size={11} />
+                  {[formatDate(sequence.start_date), formatDate(sequence.end_date)].filter(Boolean).join(" → ")}
+                </span>
+              )}
+              {sequence.learning_goal && (
+                <p className="w-full text-sm mt-1" style={{ color: onSurfaceVariant, opacity: 0.85, lineHeight: 1.55 }}>
+                  {sequence.learning_goal}
+                </p>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {/* ── Activities ───────────────────────────────────────────────────────── */}
