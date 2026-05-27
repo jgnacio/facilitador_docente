@@ -6,9 +6,10 @@ import { flushSync } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
+import { useQuery } from "@tanstack/react-query";
 import { Button, Card } from "@heroui/react";
-import { getChatSessions, deleteChatSession, getSessionMessages, type ChatSession, type PdfRef } from "../../api-actions";
-import { BookOpen, HeartHandshake, Layers, Lightbulb, Sparkles, Plus, Mic, Hammer, SendHorizontal, RotateCcw } from "lucide-react";
+import { getChatSessions, deleteChatSession, getSessionMessages, getProject, getGroup, getSequences, getActivities, type ChatSession, type PdfRef } from "../../api-actions";
+import { BookOpen, HeartHandshake, Layers, Lightbulb, Sparkles, Plus, Mic, Hammer, SendHorizontal, RotateCcw, ChevronDown, ChevronRight, FolderOpen, FileText, X, PanelLeftOpen } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -202,6 +203,15 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
   const [sessions, setSessions]       = useState<ChatSession[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Parse group_id and project_id from context message
+  const ctxMatch = contextMessage?.match(/group_id=([^,\]]+)[^[]*project_id=([^\]]+)/);
+  const ctxGroupId = ctxMatch?.[1]?.trim();
+  const ctxProjectId = ctxMatch?.[2]?.trim();
+  const hasProjectCtx = Boolean(ctxGroupId && ctxProjectId);
+
+  const [showProjectPanel, setShowProjectPanel] = useState(false);
+
   const bottomRef                     = useRef<HTMLDivElement>(null);
   const scrollContainerRef            = useRef<HTMLDivElement>(null);
   const textareaRef                   = useRef<HTMLTextAreaElement>(null);
@@ -353,7 +363,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 relative">
+    <div className="flex h-full min-h-0 relative">
 
       {/* ── Session Sidebar ──────────────────────────────────────────────── */}
       <AnimatePresence>
@@ -369,69 +379,120 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
         )}
       </AnimatePresence>
 
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div
-        className="flex items-center justify-between px-6 py-4 flex-shrink-0"
-        style={{
-          background: "var(--glass-bg)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          boxShadow: "0 1px 0 var(--border-subtle)",
-        }}
-      >
-        <div className="flex items-center gap-3">
-
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowSidebar((v) => !v)}
-            aria-label="Historial de conversaciones"
-            className="flex items-center gap-1.5 rounded-xl transition-all active:scale-95 px-3 py-2 text-sm font-medium"
-            style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}
-          >
-            <HistoryIcon />
-            Chats
-          </button>
-        </div>
-      </div>
-
-      {/* ── Context Badge ────────────────────────────────────────────── */}
-      {showContext && contextLabel && (
+      {/* ── Left Rail ───────────────────────────────────────────────────── */}
+      <div style={{ flexShrink: 0, display: "flex", flexDirection: "row", borderRight: "1px solid var(--border-subtle)" }}>
+        {/* Icon column */}
         <div
-          className="flex items-center justify-between px-4 py-2 flex-shrink-0"
           style={{
-            background: "color-mix(in srgb, var(--primary) 10%, transparent)",
-            borderBottom: "1px solid color-mix(in srgb, var(--primary) 20%, transparent)",
+            width: "48px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            paddingTop: "12px",
+            gap: "4px",
+            background: "var(--surface-container-low)",
           }}
         >
-          <div className="flex items-center gap-2 min-w-0">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-            </svg>
-            <span
-              className="text-xs truncate"
-              style={{ color: "var(--primary)", fontFamily: "var(--font-dm-sans)", fontWeight: 600 }}
-            >
-              {contextLabel}
-            </span>
-          </div>
           <button
-            onClick={() => setShowContext(false)}
-            className="flex-shrink-0 ml-2 rounded-full p-0.5 transition-opacity hover:opacity-70"
-            style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", lineHeight: 1 }}
-            aria-label="Cerrar contexto"
+            onClick={() => setShowSidebar((v) => !v)}
+            title="Historial de conversaciones"
+            className="flex items-center justify-center rounded-xl transition-all active:scale-95"
+            style={{ width: "36px", height: "36px", color: "var(--on-surface-variant)", background: "transparent", border: "none", cursor: "pointer" }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <HistoryIcon />
           </button>
+          {hasProjectCtx && (
+            <button
+              onClick={() => setShowProjectPanel((v) => !v)}
+              title="Panel de proyecto"
+              className="flex items-center justify-center rounded-xl transition-all active:scale-95"
+              style={{
+                width: "36px",
+                height: "36px",
+                color: showProjectPanel ? "var(--primary)" : "var(--on-surface-variant)",
+                background: showProjectPanel ? "color-mix(in srgb, var(--primary) 12%, transparent)" : "transparent",
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              <PanelLeftOpen size={16} />
+            </button>
+          )}
         </div>
-      )}
 
-      {/* ── Messages / Welcome ────────────────────────────────────────── */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto w-full min-h-0 flex flex-col items-center"
-        style={{ padding: "1.5rem 1.25rem", gap: "1rem" }}
-      >
+        {/* Expanded project panel */}
+        <AnimatePresence>
+          {showProjectPanel && hasProjectCtx && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 252, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 320, damping: 30 }}
+              style={{ overflow: "hidden", borderLeft: "1px solid var(--border-subtle)", background: "var(--surface-container-low)" }}
+            >
+              <div style={{ width: "252px", height: "100%", display: "flex", flexDirection: "column" }}>
+                <div
+                  className="flex items-center justify-between px-3 flex-shrink-0"
+                  style={{ height: "40px", borderBottom: "1px solid var(--border-subtle)" }}
+                >
+                  <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-display)" }}>
+                    Contexto del proyecto
+                  </span>
+                  <button
+                    onClick={() => setShowProjectPanel(false)}
+                    style={{ color: "var(--on-surface-variant)", background: "none", border: "none", cursor: "pointer", lineHeight: 1 }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+                <ProjectContextContent groupId={ctxGroupId!} projectId={ctxProjectId!} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ── Main Chat Area ──────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-h-0">
+
+        {/* Context badge (normal flow) */}
+        {showContext && contextLabel && (
+          <div
+            className="flex items-center justify-between px-4 flex-shrink-0"
+            style={{
+              height: "36px",
+              background: "color-mix(in srgb, var(--primary) 8%, var(--surface))",
+              borderBottom: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
+            }}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+              </svg>
+              <span className="text-xs truncate" style={{ color: "var(--primary)", fontFamily: "var(--font-dm-sans)", fontWeight: 600 }}>
+                {contextLabel}
+              </span>
+            </div>
+            <button
+              onClick={() => setShowContext(false)}
+              className="flex-shrink-0"
+              style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", lineHeight: 1 }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* Messages / Welcome */}
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto w-full min-h-0 flex flex-col items-center"
+          style={{ padding: "1.5rem 1.25rem", gap: "1rem" }}
+        >
         <AnimatePresence mode="wait">
           {messages.length === 0 ? (
             <motion.div
@@ -612,6 +673,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
           )}
         </AnimatePresence>
       </motion.div>
+      </div>
     </div>
   );
 }
@@ -1425,6 +1487,292 @@ function TrashIcon() {
       <path d="M14 11v6" />
       <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
     </svg>
+  );
+}
+
+// ── ProjectContextContent ─────────────────────────────────────────────────────
+
+function ProjectContextContent({ groupId, projectId }: { groupId: string; projectId: string }) {
+  const [expandedSeqs, setExpandedSeqs] = useState<Set<string>>(new Set());
+
+  const { data: group } = useQuery({
+    queryKey: ["group", groupId],
+    queryFn: () => getGroup(groupId),
+    enabled: Boolean(groupId),
+  });
+  const { data: project } = useQuery({
+    queryKey: ["project", groupId, projectId],
+    queryFn: () => getProject(groupId, projectId),
+    enabled: Boolean(groupId) && Boolean(projectId),
+  });
+  const { data: sequences = [] } = useQuery({
+    queryKey: ["sequences", groupId, projectId],
+    queryFn: () => getSequences(groupId, projectId),
+    enabled: Boolean(groupId) && Boolean(projectId),
+  });
+
+  const toggleSeq = (id: string) =>
+    setExpandedSeqs((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  return (
+    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      {project ? (
+        <div className="space-y-2">
+          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "var(--primary)", fontFamily: "var(--font-display)" }}>
+            Proyecto
+          </p>
+          <p className="font-bold text-sm leading-snug" style={{ color: "var(--on-surface)", fontFamily: "var(--font-display)" }}>
+            {project.name}
+          </p>
+          {group && (
+            <p className="text-xs" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)" }}>
+              {group.name} · {group.stage} · Nivel {group.level}
+            </p>
+          )}
+          {project.purpose && (
+            <p className="text-xs leading-relaxed" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", opacity: 0.85 }}>
+              {project.purpose}
+            </p>
+          )}
+          {project.duration_weeks && (
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "var(--primary-subtle)", color: "var(--primary)", fontFamily: "var(--font-dm-sans)" }}>
+              {project.duration_weeks} semanas
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex justify-center py-4">
+          <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: "var(--primary)" }}>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+        </div>
+      )}
+
+      {sequences.length > 0 && <div style={{ height: "1px", background: "var(--border-subtle)" }} />}
+
+      {sequences.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--primary)", fontFamily: "var(--font-display)" }}>
+            Secuencias ({sequences.length})
+          </p>
+          {sequences.map((seq) => (
+            <SequenceCollapsible
+              key={seq.id}
+              seq={seq}
+              groupId={groupId}
+              projectId={projectId}
+              expanded={expandedSeqs.has(seq.id)}
+              onToggle={() => toggleSeq(seq.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ProjectContextPanel ───────────────────────────────────────────────────────
+
+function ProjectContextPanel({ groupId, projectId, onClose }: {
+  groupId: string;
+  projectId: string;
+  onClose: () => void;
+}) {
+  const [expandedSeqs, setExpandedSeqs] = useState<Set<string>>(new Set());
+
+  const { data: group } = useQuery({
+    queryKey: ["group", groupId],
+    queryFn: () => getGroup(groupId),
+    enabled: Boolean(groupId),
+  });
+  const { data: project } = useQuery({
+    queryKey: ["project", groupId, projectId],
+    queryFn: () => getProject(groupId, projectId),
+    enabled: Boolean(groupId) && Boolean(projectId),
+  });
+  const { data: sequences = [] } = useQuery({
+    queryKey: ["sequences", groupId, projectId],
+    queryFn: () => getSequences(groupId, projectId),
+    enabled: Boolean(groupId) && Boolean(projectId),
+  });
+
+  const toggleSeq = (id: string) =>
+    setExpandedSeqs((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  return (
+    <motion.div
+      initial={{ x: "-100%", opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: "-100%", opacity: 0 }}
+      transition={{ type: "spring", stiffness: 320, damping: 30 }}
+      className="absolute inset-y-0 left-0 z-20 flex flex-col"
+      style={{
+        width: "300px",
+        background: "var(--surface-container-low)",
+        boxShadow: "2px 0 16px rgba(0,0,0,0.10)",
+        borderRight: "1px solid var(--border-subtle)",
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ borderBottom: "1px solid var(--border-subtle)" }}>
+        <span className="font-bold text-sm" style={{ color: "var(--on-surface)", fontFamily: "var(--font-display)" }}>
+          Contexto del proyecto
+        </span>
+        <button onClick={onClose} style={{ color: "var(--on-surface-variant)", background: "none", border: "none", cursor: "pointer", lineHeight: 1 }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {/* Project info */}
+        {project ? (
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "var(--primary)", fontFamily: "var(--font-display)" }}>
+              Proyecto
+            </p>
+            <p className="font-bold text-sm leading-snug" style={{ color: "var(--on-surface)", fontFamily: "var(--font-display)" }}>
+              {project.name}
+            </p>
+            {group && (
+              <p className="text-xs" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)" }}>
+                {group.name} · {group.stage} · Nivel {group.level}
+              </p>
+            )}
+            {project.purpose && (
+              <p className="text-xs leading-relaxed" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", opacity: 0.85 }}>
+                {project.purpose}
+              </p>
+            )}
+            {project.duration_weeks && (
+              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: "var(--primary-subtle)", color: "var(--primary)", fontFamily: "var(--font-dm-sans)" }}>
+                {project.duration_weeks} semanas
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex justify-center py-4">
+            <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: "var(--primary)" }}>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+          </div>
+        )}
+
+        {/* Divider */}
+        {sequences.length > 0 && <div style={{ height: "1px", background: "var(--border-subtle)" }} />}
+
+        {/* Sequences */}
+        {sequences.length > 0 && (
+          <div className="space-y-1">
+            <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--primary)", fontFamily: "var(--font-display)" }}>
+              Secuencias ({sequences.length})
+            </p>
+            {sequences.map((seq) => (
+              <SequenceCollapsible
+                key={seq.id}
+                seq={seq}
+                groupId={groupId}
+                projectId={projectId}
+                expanded={expandedSeqs.has(seq.id)}
+                onToggle={() => toggleSeq(seq.id)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function SequenceCollapsible({ seq, groupId, projectId, expanded, onToggle }: {
+  seq: { id: string; name: string; learning_goal?: string };
+  groupId: string;
+  projectId: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const { data: activities = [], isFetching } = useQuery({
+    queryKey: ["activities", groupId, projectId, seq.id],
+    queryFn: () => getActivities(groupId, projectId, seq.id),
+    enabled: expanded,
+  });
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(127,127,127,0.1)" }}>
+      {/* Sequence header */}
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-2 px-3 py-2.5 text-left transition-colors"
+        style={{
+          background: expanded ? "color-mix(in srgb, var(--primary) 6%, var(--surface-container-low))" : "var(--surface-container-low)",
+          border: "none",
+          cursor: "pointer",
+        }}
+      >
+        <span style={{ color: "var(--primary)", flexShrink: 0 }}>
+          {expanded
+            ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          }
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold truncate" style={{ color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
+            {seq.name}
+          </p>
+          {seq.learning_goal && (
+            <p className="text-xs truncate mt-0.5" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", opacity: 0.7, fontSize: "0.68rem" }}>
+              {seq.learning_goal}
+            </p>
+          )}
+        </div>
+      </button>
+
+      {/* Activities */}
+      {expanded && (
+        <div style={{ background: "var(--surface)", borderTop: "1px solid rgba(127,127,127,0.08)" }}>
+          {isFetching ? (
+            <div className="flex justify-center py-3">
+              <svg className="animate-spin" width="13" height="13" viewBox="0 0 24 24" fill="none" style={{ color: "var(--primary)" }}>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            </div>
+          ) : activities.length === 0 ? (
+            <p className="px-3 py-2 text-xs" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", opacity: 0.6 }}>Sin actividades</p>
+          ) : (
+            activities.map((act) => (
+              <div key={act.id} className="flex items-start gap-2 px-3 py-2" style={{ borderTop: "1px solid rgba(127,127,127,0.06)" }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: "2px", opacity: 0.6 }}>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium leading-snug" style={{ color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
+                    {act.title}
+                  </p>
+                  {act.learning_goal && (
+                    <p className="text-xs mt-0.5 leading-relaxed" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", fontSize: "0.68rem", opacity: 0.75 }}>
+                      {act.learning_goal}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

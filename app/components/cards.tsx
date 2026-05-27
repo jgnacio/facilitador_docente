@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Folder, Calendar, ArrowRight, Trash2, Pencil } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Folder, Calendar, ArrowRight, Trash2, Pencil, FileText, MoreVertical, BookOpen, SquareArrowOutUpRight, Download, FileSpreadsheet, FileDown, ChevronRight as ChevronRightIcon } from "lucide-react";
 import { Spinner } from "@heroui/react";
 import { type IntegrativeProject, type ActivitySequence, type Activity } from "@/app/api-actions";
+import { ActivityMiniView } from "@/app/components/activity-content";
 
 function formatDateShort(dateStr?: string): string {
   if (!dateStr) return "";
@@ -12,15 +13,6 @@ function formatDateShort(dateStr?: string): string {
   } catch {
     return dateStr;
   }
-}
-
-function titleFromContent(raw?: string): string | null {
-  if (!raw) return null;
-  try {
-    const p = JSON.parse(raw);
-    if (p && typeof p.titulo === "string") return p.titulo;
-  } catch { /* not JSON */ }
-  return null;
 }
 
 // ── ProjectCard ───────────────────────────────────────────────────────────────
@@ -202,6 +194,7 @@ export function ProjectCard({
 
 export function SequenceCard({
   sequence,
+  activityCount = 0,
   onSurface,
   onSurfaceVariant,
   onClick,
@@ -209,6 +202,7 @@ export function SequenceCard({
   isDeleting,
 }: {
   sequence: ActivitySequence;
+  activityCount?: number;
   onSurface: string;
   onSurfaceVariant: string;
   onClick: () => void;
@@ -216,18 +210,36 @@ export function SequenceCard({
   isDeleting: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => setMenuOpen(false);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [menuOpen]);
+
+  function openMenu(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!menuBtnRef.current) return;
+    const r = menuBtnRef.current.getBoundingClientRect();
+    setMenuPos({ top: r.bottom + 4, left: r.left });
+    setMenuOpen((v) => !v);
+  }
 
   return (
     <div
       style={{
-        background: "var(--surface)",
-        borderRadius: "1.25rem",
-        padding: "1rem 1.5rem",
-        border: `1px solid ${hovered ? "rgba(127,127,127,0.15)" : "rgba(127,127,127,0.08)"}`,
-        transition: "border-color 0.18s ease",
+        background: hovered ? "var(--surface-container-low)" : "var(--surface)",
+        borderRadius: "0.875rem",
+        padding: "0.75rem 1rem",
+        border: `1.5px solid ${hovered ? "var(--outline-variant, rgba(127,127,127,0.28))" : "rgba(127,127,127,0.14)"}`,
+        transition: "background 0.15s ease, border-color 0.15s ease",
         display: "flex",
         alignItems: "center",
-        gap: "1rem",
+        gap: "0.75rem",
         cursor: "pointer",
       }}
       onClick={onClick}
@@ -236,35 +248,30 @@ export function SequenceCard({
     >
       <div
         style={{
-          width: "32px",
-          height: "32px",
-          borderRadius: "0.65rem",
+          width: "36px",
+          height: "36px",
+          borderRadius: "0.625rem",
           flexShrink: 0,
-          background: hovered ? "var(--primary-subtle)" : "rgba(0,0,0,0.04)",
+          background: "rgba(127,127,127,0.1)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: hovered ? "var(--primary)" : onSurfaceVariant,
-          fontSize: "0.75rem",
-          fontWeight: 700,
-          fontFamily: "var(--font-dm-sans)",
-          transition: "background 0.18s ease, color 0.18s ease",
+          color: "rgba(100,100,100,0.7)",
         }}
       >
-        {sequence.order}
+        <Folder size={18} strokeWidth={1.5} />
       </div>
 
-      <div className="text-left" style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <p
           style={{
             fontWeight: 600,
-            fontSize: "0.88rem",
+            fontSize: "0.875rem",
             fontFamily: "var(--font-dm-sans)",
             color: onSurface,
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            marginBottom: "0.15rem",
           }}
         >
           {sequence.name}
@@ -272,9 +279,9 @@ export function SequenceCard({
         {sequence.learning_goal && (
           <p
             style={{
-              fontSize: "0.75rem",
+              fontSize: "0.72rem",
               color: onSurfaceVariant,
-              opacity: 0.7,
+              opacity: 0.65,
               fontFamily: "var(--font-dm-sans)",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -284,45 +291,82 @@ export function SequenceCard({
             {sequence.learning_goal}
           </p>
         )}
-        {(sequence.start_date || sequence.end_date) && (
-          <div className="flex items-center gap-1 mt-0.5" style={{ color: onSurfaceVariant, opacity: 0.45 }}>
-            <Calendar size={11} />
-            <span style={{ fontSize: "0.7rem", fontFamily: "var(--font-dm-sans)" }}>
-              {[formatDateShort(sequence.start_date), formatDateShort(sequence.end_date)]
-                .filter(Boolean)
-                .join(" → ")}
-            </span>
-          </div>
-        )}
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-        <ArrowRight
-          size={14}
+      {activityCount > 0 && (
+        <span
           style={{
-            color: hovered ? "var(--primary)" : onSurfaceVariant,
-            opacity: hovered ? 0.9 : 0.2,
-            transition: "color 0.18s, opacity 0.18s",
+            fontSize: "0.7rem",
+            fontWeight: 600,
+            color: onSurfaceVariant,
+            fontFamily: "var(--font-dm-sans)",
+            opacity: 0.55,
+            flexShrink: 0,
           }}
-        />
+        >
+          {activityCount} {activityCount === 1 ? "act." : "acts."}
+        </span>
+      )}
+
+      <div onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
         <button
-          onClick={onDelete}
-          disabled={isDeleting}
-          className="flex items-center justify-center"
-          title="Eliminar"
+          ref={menuBtnRef}
+          onClick={openMenu}
           style={{
             width: "28px",
             height: "28px",
             borderRadius: "0.5rem",
             border: "none",
-            background: "transparent",
+            background: menuOpen ? "rgba(127,127,127,0.1)" : "transparent",
             color: onSurfaceVariant,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             cursor: "pointer",
-            opacity: 0.3,
+            transition: "background 0.12s",
           }}
         >
-          {isDeleting ? <Spinner size="sm" color="current" /> : <Trash2 size={13} />}
+          <MoreVertical size={14} />
         </button>
+        {menuOpen && (
+          <div
+            style={{
+              position: "fixed",
+              top: menuPos.top,
+              left: menuPos.left,
+              background: "var(--surface)",
+              border: "1px solid rgba(127,127,127,0.15)",
+              borderRadius: "0.75rem",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+              zIndex: 9999,
+              minWidth: "140px",
+              overflow: "hidden",
+            }}
+          >
+            <button
+              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}
+              disabled={isDeleting}
+              style={{
+                width: "100%",
+                padding: "0.625rem 1rem",
+                background: "transparent",
+                border: "none",
+                color: "var(--danger)",
+                fontSize: "0.82rem",
+                fontFamily: "var(--font-dm-sans)",
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                textAlign: "left",
+              }}
+            >
+              {isDeleting ? <Spinner size="sm" color="current" /> : <Trash2 size={13} />}
+              Eliminar
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -336,105 +380,342 @@ export function ActivityCard({
   onSurfaceVariant,
   onClick,
   onDelete,
+  onRename,
+  onDownloadPdf,
+  onDownloadExcel,
   isDeleting,
+  selected = false,
+  onSelect,
 }: {
   activity: Activity;
   onSurface: string;
   onSurfaceVariant: string;
   onClick: () => void;
   onDelete: () => void;
+  onRename?: () => void;
+  onDownloadPdf?: () => void;
+  onDownloadExcel?: () => void;
   isDeleting: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
-  const preview = titleFromContent(activity.raw_content) ?? activity.curriculum_space ?? activity.activity_type;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const hasContent = Boolean(activity.raw_content);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = () => setMenuOpen(false);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [menuOpen]);
+
+  function openMenu(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!menuBtnRef.current) return;
+    const r = menuBtnRef.current.getBoundingClientRect();
+    setMenuPos({ top: r.bottom + 4, left: r.left });
+    setMenuOpen((v) => !v);
+  }
+
+  const surfaceBg = selected
+    ? "var(--primary-subtle)"
+    : hovered
+    ? "var(--surface-container, rgba(0,0,0,0.04))"
+    : "rgba(0,0,0,0.02)";
 
   return (
     <div
       style={{
-        background: "var(--surface)",
-        borderRadius: "1.25rem",
-        padding: "1rem 1.5rem",
-        border: `1px solid ${hovered ? "rgba(127,127,127,0.15)" : "rgba(127,127,127,0.08)"}`,
-        transition: "border-color 0.18s ease",
-        display: "flex",
-        alignItems: "center",
-        gap: "1rem",
+        background: surfaceBg,
+        borderRadius: "0.875rem",
+        border: "none",
+        transition: "background 0.15s ease",
         cursor: "pointer",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        height: "245.5px",
       }}
-      onClick={onClick}
+      data-activity-card="true"
+      onClick={() => onSelect?.()}
+      onDoubleClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      {/* Header — ícono + título + menú, 48px de altura como en Drive */}
       <div
         style={{
-          width: "28px",
-          height: "28px",
-          borderRadius: "0.5rem",
-          flexShrink: 0,
-          background: hovered ? "var(--primary-subtle)" : "rgba(0,0,0,0.04)",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
-          color: hovered ? "var(--primary)" : onSurfaceVariant,
-          fontSize: "0.72rem",
-          fontWeight: 700,
-          fontFamily: "var(--font-dm-sans)",
-          transition: "background 0.18s ease, color 0.18s ease",
+          gap: "0.5rem",
+          padding: "0 8px",
+          height: "48px",
+          flexShrink: 0,
+          minWidth: 0,
+          background: surfaceBg,
+          transition: "background 0.15s ease",
         }}
       >
-        {activity.order}
-      </div>
+        <FileText
+          size={16}
+          strokeWidth={1.75}
+          style={{ flexShrink: 0, color: "var(--primary)" }}
+        />
 
-      <div className="text-left" style={{ flex: 1, minWidth: 0 }}>
         <p
           style={{
-            fontWeight: 600,
-            fontSize: "0.88rem",
+            fontWeight: 500,
+            fontSize: "0.8125rem",
+            lineHeight: "20px",
             fontFamily: "var(--font-dm-sans)",
-            color: hovered ? "var(--primary)" : onSurface,
-            marginBottom: preview ? "0.15rem" : 0,
-            transition: "color 0.18s ease",
+            color: onSurface,
+            flex: 1,
+            minWidth: 0,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           {activity.title}
         </p>
-        {preview && (
-          <p
+
+        <div onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
+          <button
+            ref={menuBtnRef}
+            onClick={openMenu}
             style={{
-              fontSize: "0.75rem",
+              width: "26px",
+              height: "26px",
+              borderRadius: "50%",
+              border: "none",
+              background: menuOpen ? "rgba(127,127,127,0.15)" : "transparent",
               color: onSurfaceVariant,
-              opacity: 0.6,
-              fontFamily: "var(--font-dm-sans)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              maxWidth: "520px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "background 0.12s",
             }}
           >
-            {preview}
-          </p>
-        )}
+            <MoreVertical size={14} />
+          </button>
+          {menuOpen && (
+            <div
+              style={{
+                position: "fixed",
+                top: menuPos.top,
+                left: menuPos.left,
+                background: "var(--surface)",
+                border: "1px solid rgba(127,127,127,0.15)",
+                borderRadius: "0.75rem",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.14)",
+                zIndex: 9999,
+                minWidth: "200px",
+                overflow: "hidden",
+                padding: "0.375rem 0",
+              }}
+            >
+              {/* Abrir */}
+              <MenuButton icon={<FileText size={15} />} label="Abrir" onClick={() => { setMenuOpen(false); onClick(); }} />
+              {/* Abrir en nueva pestaña */}
+              <MenuButton icon={<SquareArrowOutUpRight size={15} />} label="Abrir en nueva pestaña" onClick={() => { setMenuOpen(false); window.open(`/activities/${activity.id}`, "_blank"); }} />
+              <MenuDivider />
+              {/* Renombrar */}
+              {onRename && <MenuButton icon={<Pencil size={15} />} label="Renombrar" onClick={() => { setMenuOpen(false); onRename(); }} />}
+              {/* Descargar con submenú */}
+              <MenuButtonWithSubmenu
+                icon={<Download size={15} />}
+                label="Descargar"
+                menuPos={menuPos}
+                items={[
+                  { icon: <FileDown size={15} />, label: "PDF", onClick: () => { setMenuOpen(false); onDownloadPdf?.(); } },
+                  { icon: <FileSpreadsheet size={15} />, label: "Excel", onClick: () => { setMenuOpen(false); onDownloadExcel?.(); } },
+                ]}
+              />
+              <MenuDivider />
+              {/* Eliminar */}
+              <MenuButton
+                icon={isDeleting ? <Spinner size="sm" color="current" /> : <Trash2 size={15} />}
+                label="Eliminar"
+                onClick={() => { setMenuOpen(false); onDelete(); }}
+                danger
+                disabled={isDeleting}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      <button
-        onClick={(e) => { e.stopPropagation(); onDelete(); }}
-        disabled={isDeleting}
-        className="flex items-center justify-center"
-        title="Eliminar"
+      {/* Preview area — fondo de la card como marco, thumbnail incrustada con margen 8px en lados y abajo */}
+      <div
         style={{
-          width: "28px",
-          height: "28px",
-          borderRadius: "0.5rem",
-          border: "none",
-          background: "transparent",
-          color: onSurfaceVariant,
-          cursor: "pointer",
-          opacity: 0.3,
-          flexShrink: 0,
+          flex: 1,
+          background: surfaceBg,
+          display: "flex",
+          flexDirection: "column",
+          transition: "background 0.15s ease",
         }}
       >
-        {isDeleting ? <Spinner size="sm" color="current" /> : <Trash2 size={13} />}
+        <div
+          style={{
+            flex: 1,
+            margin: "0 8px 8px 8px",
+            background: "var(--surface-container-lowest, #f8f8f8)",
+            overflow: "hidden",
+            position: "relative",
+          }}
+        >
+          {hasContent ? (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "357%",
+                transformOrigin: "top left",
+                transform: "scale(0.28)",
+                pointerEvents: "none",
+                userSelect: "none",
+              }}
+            >
+              <ActivityMiniView title={activity.title} rawContent={activity.raw_content} />
+            </div>
+          ) : (
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--on-surface-variant)",
+                opacity: 0.18,
+              }}
+            >
+              <BookOpen size={32} strokeWidth={1.5} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Menu helpers ──────────────────────────────────────────────────────────────
+
+function MenuButton({ icon, label, onClick, danger, disabled }: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+}) {
+  const [hov, setHov] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        width: "100%",
+        padding: "0.5rem 1rem",
+        background: hov ? "rgba(127,127,127,0.07)" : "transparent",
+        border: "none",
+        color: danger ? "var(--danger)" : "var(--on-surface)",
+        fontSize: "0.82rem",
+        fontFamily: "var(--font-dm-sans)",
+        fontWeight: 500,
+        cursor: disabled ? "not-allowed" : "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: "0.75rem",
+        textAlign: "left",
+        opacity: disabled ? 0.5 : 1,
+        transition: "background 0.1s",
+      }}
+    >
+      <span style={{ opacity: 0.7, flexShrink: 0 }}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+function MenuDivider() {
+  return <div style={{ height: "1px", background: "rgba(127,127,127,0.1)", margin: "0.25rem 0" }} />;
+}
+
+function MenuButtonWithSubmenu({ icon, label, items, menuPos }: {
+  icon: React.ReactNode;
+  label: string;
+  menuPos: { top: number; left: number };
+  items: { icon: React.ReactNode; label: string; onClick: () => void }[];
+}) {
+  const [hov, setHov] = useState(false);
+  const [subPos, setSubPos] = useState({ top: 0, left: 0 });
+  const rowRef = useRef<HTMLButtonElement>(null);
+
+  function handleMouseEnter() {
+    setHov(true);
+    if (rowRef.current) {
+      const r = rowRef.current.getBoundingClientRect();
+      setSubPos({ top: r.top, left: r.right });
+    }
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        ref={rowRef}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          width: "100%",
+          padding: "0.5rem 1rem",
+          background: hov ? "rgba(127,127,127,0.07)" : "transparent",
+          border: "none",
+          color: "var(--on-surface)",
+          fontSize: "0.82rem",
+          fontFamily: "var(--font-dm-sans)",
+          fontWeight: 500,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+          textAlign: "left",
+          transition: "background 0.1s",
+        }}
+      >
+        <span style={{ opacity: 0.7, flexShrink: 0 }}>{icon}</span>
+        <span style={{ flex: 1 }}>{label}</span>
+        <ChevronRightIcon size={13} style={{ opacity: 0.45 }} />
       </button>
+
+      {hov && (
+        <div
+          onMouseEnter={() => setHov(true)}
+          onMouseLeave={() => setHov(false)}
+          style={{
+            position: "fixed",
+            top: subPos.top,
+            left: subPos.left,
+            background: "var(--surface)",
+            border: "1px solid rgba(127,127,127,0.15)",
+            borderRadius: "0.75rem",
+            zIndex: 10000,
+            minWidth: "160px",
+            overflow: "hidden",
+            padding: "0.375rem 0",
+          }}
+        >
+          {items.map((item) => (
+            <MenuButton key={item.label} icon={item.icon} label={item.label} onClick={item.onClick} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

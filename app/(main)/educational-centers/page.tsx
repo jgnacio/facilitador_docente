@@ -12,6 +12,7 @@ import {
   TextField,
 } from "@heroui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useConfirmModal } from "@/app/components/ui/confirm-modal";
 import { Building2, Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import {
   getEducationalCenters,
@@ -97,6 +98,7 @@ function CenterForm({
 
 export default function EducationalCentersPage() {
   const queryClient = useQueryClient();
+  const { confirm, modal: confirmModal } = useConfirmModal();
   const [view, setView] = useState<View>("list");
   const [editing, setEditing] = useState<EducationalCenter | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -108,12 +110,17 @@ export default function EducationalCentersPage() {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["educational-centers"] });
 
-  const handleDelete = async (center: EducationalCenter) => {
-    if (!confirm(`¿Eliminar "${center.name}"? Esta acción no se puede deshacer.`)) return;
-    setDeletingId(center.id);
-    await deleteEducationalCenter(center.id);
-    setDeletingId(null);
-    refresh();
+  const handleDelete = (center: EducationalCenter) => {
+    confirm({
+      title: "Eliminar centro educativo",
+      message: `¿Estás seguro de que deseas eliminar "${center.name}"? Esta acción no se puede deshacer.`,
+      onConfirm: async () => {
+        setDeletingId(center.id);
+        await deleteEducationalCenter(center.id);
+        setDeletingId(null);
+        refresh();
+      },
+    });
   };
 
   // Edit view
@@ -142,6 +149,8 @@ export default function EducationalCentersPage() {
   }
 
   return (
+    <>
+    {confirmModal}
     <div className="p-6 max-w-4xl w-full mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -254,5 +263,6 @@ export default function EducationalCentersPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

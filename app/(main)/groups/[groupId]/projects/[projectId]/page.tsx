@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Spinner } from "@heroui/react";
@@ -14,8 +14,10 @@ import {
   createActivity,
   deleteSequence,
   deleteActivity,
+  updateActivity,
 } from "@/app/api-actions";
 import { SequenceCard, ActivityCard } from "@/app/components/cards";
+import { useConfirmModal, RenameModal } from "@/app/components/ui/confirm-modal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -27,6 +29,17 @@ export default function ProjectDetailPage() {
   const projectId = params.projectId as string;
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { confirm, modal: confirmModal } = useConfirmModal();
+  const [selectedActId, setSelectedActId] = useState<string | null>(null);
+  useEffect(() => {
+    const clear = (e: MouseEvent) => {
+      if (!(e.target as Element).closest("[data-activity-card]")) {
+        setSelectedActId(null);
+      }
+    };
+    document.addEventListener("click", clear);
+    return () => document.removeEventListener("click", clear);
+  }, []);
 
   // Sequence form state
   const [showSeqForm, setShowSeqForm] = useState(false);
@@ -71,6 +84,14 @@ export default function ProjectDetailPage() {
   // Activities without a sequence (isolated)
   const isolatedActivities = allActivities.filter((a) => !a.sequence_id);
 
+  // Activity count per sequence
+  const activitiesBySequence = allActivities.reduce<Record<string, number>>((acc, act) => {
+    if (act.sequence_id) {
+      acc[act.sequence_id] = (acc[act.sequence_id] ?? 0) + 1;
+    }
+    return acc;
+  }, {});
+
   const createSeqMutation = useMutation({
     mutationFn: (data: Parameters<typeof createSequence>[2]) => createSequence(groupId, projectId, data),
     onSuccess: (result) => {
@@ -101,6 +122,50 @@ export default function ProjectDetailPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["activities", groupId, projectId] }),
   });
 
+  const [renamingActId, setRenamingActId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  const renameActMutation = useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) => updateActivity(id, { title }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities", groupId, projectId] });
+      setRenamingActId(null);
+    },
+  });
+
+  const handleRenameAct = (actId: string, currentTitle: string) => {
+    setRenameValue(currentTitle);
+    setRenamingActId(actId);
+  };
+
+  const handleDownloadPdf = async (act: { title: string; raw_content?: string }) => {
+    const { pdf } = await import("@react-pdf/renderer");
+    const { ActivityPDF } = await import("@/app/components/pdf/ActivityPDF");
+    const blob = await pdf(<ActivityPDF title={act.title} content={act.raw_content} />).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${act.title.replace(/\s+/g, "_").slice(0, 60)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadExcel = (act: { title: string; raw_content?: string }) => {
+    const bom = "\uFEFF";
+    const headers = ["Título", "Contenido"];
+    const rows = [[act.title, act.raw_content ?? ""]];
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${act.title.replace(/\s+/g, "_").slice(0, 60)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const resetSeqForm = () => {
     setShowSeqForm(false);
     setSeqName(""); setSeqGoal(""); setSeqStartDate(""); setSeqEndDate("");
@@ -122,6 +187,21 @@ export default function ProjectDetailPage() {
       project?.purpose ? `Propósito: ${project.purpose}.` : "",
     ].filter(Boolean).join(" ");
     const label = `Proyecto: ${project?.name ?? "..."} · Grupo: ${group?.name ?? "..."} · Nivel ${group?.level ?? ""}`;
+    goToChat(ctx, label);
+  };
+
+  const handleCreateActivitySueltaWithChat = () => {
+    const actList = isolatedActivities.length > 0
+      ? `Actividades sueltas existentes: ${isolatedActivities.map((a, i) => `${i + 1}. ${a.title}`).join(", ")}.`
+      : "Aún no hay actividades sueltas en este proyecto.";
+    const ctx = [
+      `[ctx: group_id=${groupId}, project_id=${projectId}]`,
+      `Proyecto integrador: "${project?.name}". Grupo: ${group?.name} (${group?.stage}, nivel ${group?.level}).`,
+      project?.purpose ? `Propósito del proyecto: ${project.purpose}.` : "",
+      "Quiero crear una actividad suelta (no pertenece a ninguna secuencia).",
+      actList,
+    ].filter(Boolean).join(" ");
+    const label = `Nueva actividad suelta · ${project?.name ?? "..."} · ${group?.name ?? "..."}`;
     goToChat(ctx, label);
   };
 
@@ -154,13 +234,21 @@ export default function ProjectDetailPage() {
   };
 
   const handleDeleteSeq = (seqId: string, name: string) => {
-    if (!confirm(`¿Eliminar la secuencia "${name}"? Se eliminarán todas sus actividades.`)) return;
-    deleteSeqMutation.mutate(seqId);
+    confirm({
+      title: "Eliminar secuencia",
+      message: `Se eliminarán "${name}" y todas sus actividades. Esta acción no se puede deshacer.`,
+      confirmLabel: "Eliminar",
+      onConfirm: () => deleteSeqMutation.mutate(seqId),
+    });
   };
 
   const handleDeleteAct = (actId: string, title: string) => {
-    if (!confirm(`¿Eliminar la actividad "${title}"?`)) return;
-    deleteActMutation.mutate(actId);
+    confirm({
+      title: "Eliminar actividad",
+      message: `¿Eliminar "${title}"? Esta acción no se puede deshacer.`,
+      confirmLabel: "Eliminar",
+      onConfirm: () => deleteActMutation.mutate(actId),
+    });
   };
 
   const onSurface = "var(--on-surface)";
@@ -169,6 +257,17 @@ export default function ProjectDetailPage() {
   const loading = loadingProject || loadingSeqs || loadingActs;
 
   return (
+    <>
+    {confirmModal}
+    {renamingActId && (
+      <RenameModal
+        value={renameValue}
+        onChange={setRenameValue}
+        isPending={renameActMutation.isPending}
+        onConfirm={() => renameActMutation.mutate({ id: renamingActId, title: renameValue.trim() })}
+        onCancel={() => setRenamingActId(null)}
+      />
+    )}
     <div style={{ padding: "2rem 2.5rem", maxWidth: "1100px", margin: "0 auto" }}>
       {/* ── Breadcrumb ───────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 mb-6 flex-wrap" style={{ fontSize: "0.82rem", fontFamily: "var(--font-dm-sans)", color: onSurfaceVariant }}>
@@ -245,11 +344,12 @@ export default function ProjectDetailPage() {
             {sequences.length === 0 ? (
               <EmptyCard icon={List} message="No hay secuencias en este proyecto" onSurfaceVariant={onSurfaceVariant} primaryColor={primaryColor} onCta={() => setShowSeqForm(true)} ctaLabel="Nueva secuencia" />
             ) : (
-              <div className="flex flex-col gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.625rem" }}>
                 {sequences.map((seq) => (
                   <SequenceCard
                     key={seq.id}
                     sequence={seq}
+                    activityCount={activitiesBySequence[seq.id] ?? 0}
                     onSurface={onSurface}
                     onSurfaceVariant={onSurfaceVariant}
                     onClick={() => router.push(`/groups/${groupId}/projects/${projectId}/sequences/${seq.id}`)}
@@ -268,7 +368,7 @@ export default function ProjectDetailPage() {
                 Actividades sueltas
               </h2>
               <button
-                onClick={() => router.push("/asistente")}
+                onClick={handleCreateActivitySueltaWithChat}
                 className="flex items-center gap-1.5 transition-all active:scale-95"
                 style={{ background: "none", border: "1.5px solid var(--outline-variant)", color: onSurfaceVariant, borderRadius: "0.75rem", padding: "0.4rem 0.875rem", fontSize: "0.8rem", fontWeight: 600, fontFamily: "var(--font-dm-sans)", cursor: "pointer" }}
               >
@@ -294,9 +394,9 @@ export default function ProjectDetailPage() {
             )}
 
             {isolatedActivities.length === 0 ? (
-              <EmptyCard icon={FileText} message="No hay actividades sueltas en este proyecto" onSurfaceVariant={onSurfaceVariant} primaryColor={primaryColor} onCta={() => setShowActForm(true)} ctaLabel="Nueva actividad suelta" />
+              <EmptyCard icon={FileText} message="No hay actividades sueltas en este proyecto" onSurfaceVariant={onSurfaceVariant} primaryColor={primaryColor} onCta={handleCreateActivitySueltaWithChat} ctaLabel="Nueva actividad suelta" />
             ) : (
-              <div className="flex flex-col gap-3">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "1rem" }}>
                 {isolatedActivities.map((act) => (
                   <ActivityCard
                     key={act.id}
@@ -305,7 +405,12 @@ export default function ProjectDetailPage() {
                     onSurfaceVariant={onSurfaceVariant}
                     onClick={() => router.push(`/activities/${act.id}`)}
                     onDelete={() => handleDeleteAct(act.id, act.title)}
+                    onRename={() => handleRenameAct(act.id, act.title)}
+                    onDownloadPdf={() => handleDownloadPdf(act)}
+                    onDownloadExcel={() => handleDownloadExcel(act)}
                     isDeleting={deleteActMutation.isPending && deleteActMutation.variables === act.id}
+                    selected={selectedActId === act.id}
+                    onSelect={() => setSelectedActId(act.id)}
                   />
                 ))}
               </div>
@@ -314,6 +419,7 @@ export default function ProjectDetailPage() {
         </div>
       )}
     </div>
+    </>
   );
 }
 

@@ -11,6 +11,7 @@ import {
   getAlumnos, getGroups, createAlumno, updateAlumno, deleteAlumno,
   type Alumno, type Group,
 } from "../../api-actions";
+import { useConfirmModal } from "@/app/components/ui/confirm-modal";
 
 const NIVELES = ["Inicial", "Primaria", "Secundaria"];
 
@@ -35,6 +36,7 @@ type View = "list" | "create" | "edit";
 
 export default function AlumnosTab() {
   const queryClient = useQueryClient();
+  const { confirm, modal: confirmModal } = useConfirmModal();
   const [view, setView]         = useState<View>("list");
   const [editing, setEditing]   = useState<Alumno | null>(null);
   const [search, setSearch]     = useState("");
@@ -61,10 +63,15 @@ export default function AlumnosTab() {
 
   const handleEdit = (a: Alumno) => { setEditing(a); setView("edit"); };
 
-  const handleDelete = async (a: Alumno) => {
-    if (!confirm(`¿Eliminar a ${a.nombre_completo}? Esta acción no se puede deshacer.`)) return;
-    await deleteAlumno(a.id);
-    refresh();
+  const handleDelete = (a: Alumno) => {
+    confirm({
+      title: "Eliminar alumno",
+      message: `¿Estás seguro de que deseas eliminar a ${a.nombre_completo}? Esta acción no se puede deshacer.`,
+      onConfirm: async () => {
+        await deleteAlumno(a.id);
+        refresh();
+      },
+    });
   };
 
   const assignMutation = useMutation({
@@ -98,6 +105,8 @@ export default function AlumnosTab() {
   }
 
   return (
+    <>
+    {confirmModal}
     <div className="p-6 max-w-4xl w-full mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -169,6 +178,7 @@ export default function AlumnosTab() {
         />
       )}
     </div>
+    </>
   );
 }
 

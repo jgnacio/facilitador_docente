@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Spinner } from "@heroui/react";
@@ -12,11 +12,13 @@ import {
   getActivities,
   createActivity,
   deleteActivity,
+  updateActivity,
   updateSequence,
   deleteSequence,
   type Activity,
 } from "@/app/api-actions";
 import { ActivityCard } from "@/app/components/cards";
+import { useConfirmModal, RenameModal } from "@/app/components/ui/confirm-modal";
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return "";
@@ -36,6 +38,17 @@ export default function SequenceDetailPage() {
   const sequenceId = params.sequenceId as string;
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { confirm, modal: confirmModal } = useConfirmModal();
+  const [selectedActId, setSelectedActId] = useState<string | null>(null);
+  useEffect(() => {
+    const clear = (e: MouseEvent) => {
+      if (!(e.target as Element).closest("[data-activity-card]")) {
+        setSelectedActId(null);
+      }
+    };
+    document.addEventListener("click", clear);
+    return () => document.removeEventListener("click", clear);
+  }, []);
 
   // New activity form
   const [showForm, setShowForm] = useState(false);
@@ -95,6 +108,50 @@ export default function SequenceDetailPage() {
     },
   });
 
+  const [renamingActId, setRenamingActId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  const renameActMutation = useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) => updateActivity(id, { title }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activities", groupId, projectId, sequenceId] });
+      setRenamingActId(null);
+    },
+  });
+
+  const handleDownloadPdf = async (act: Activity) => {
+    const { pdf } = await import("@react-pdf/renderer");
+    const { ActivityPDF } = await import("@/app/components/pdf/ActivityPDF");
+    const blob = await pdf(<ActivityPDF title={act.title} content={act.raw_content} />).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${act.title.replace(/\s+/g, "_").slice(0, 60)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadExcel = (act: Activity) => {
+    const bom = "\uFEFF";
+    const headers = ["Título", "Contenido"];
+    const rows = [[act.title, act.raw_content ?? ""]];
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${act.title.replace(/\s+/g, "_").slice(0, 60)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRename = (activityId: string, currentTitle: string) => {
+    setRenameValue(currentTitle);
+    setRenamingActId(activityId);
+  };
+
   const updateSeqMutation = useMutation({
     mutationFn: (data: Parameters<typeof updateSequence>[3]) => updateSequence(groupId, projectId, sequenceId, data),
     onSuccess: (result) => {
@@ -139,13 +196,19 @@ export default function SequenceDetailPage() {
   };
 
   const handleDelete = (activityId: string, title: string) => {
-    if (!confirm(`¿Eliminar la actividad "${title}"?`)) return;
-    deleteActMutation.mutate(activityId);
+    confirm({
+      title: "Eliminar actividad",
+      message: `¿Estás seguro de que deseas eliminar la actividad "${title}"? Esta acción no se puede deshacer.`,
+      onConfirm: () => deleteActMutation.mutate(activityId),
+    });
   };
 
   const handleDeleteSequence = () => {
-    if (!confirm(`¿Eliminar la secuencia "${sequence?.name}"? Se eliminarán todas sus actividades.`)) return;
-    deleteSeqMutation.mutate();
+    confirm({
+      title: "Eliminar secuencia",
+      message: `¿Estás seguro de que deseas eliminar la secuencia "${sequence?.name}"? Se eliminarán todas sus actividades y no se puede deshacer.`,
+      onConfirm: () => deleteSeqMutation.mutate(),
+    });
   };
 
   const openEditSeq = () => {
@@ -172,6 +235,17 @@ export default function SequenceDetailPage() {
   const primaryColor = "var(--primary)";
 
   return (
+    <>
+    {confirmModal}
+    {renamingActId && (
+      <RenameModal
+        value={renameValue}
+        onChange={setRenameValue}
+        isPending={renameActMutation.isPending}
+        onConfirm={() => renameActMutation.mutate({ id: renamingActId, title: renameValue.trim() })}
+        onCancel={() => setRenamingActId(null)}
+      />
+    )}
     <div style={{ padding: "2rem 2.5rem", maxWidth: "1100px", margin: "0 auto" }}>
       {/* ── Breadcrumb ───────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 mb-6 flex-wrap" style={{ fontSize: "0.82rem", fontFamily: "var(--font-dm-sans)", color: onSurfaceVariant }}>
@@ -332,7 +406,7 @@ export default function SequenceDetailPage() {
             </button>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "1rem" }}>
             {sortedActivities.map((act) => (
               <ActivityCard
                 key={act.id}
@@ -341,13 +415,19 @@ export default function SequenceDetailPage() {
                 onSurfaceVariant={onSurfaceVariant}
                 onClick={() => router.push(`/activities/${act.id}`)}
                 onDelete={() => handleDelete(act.id, act.title)}
+                onRename={() => handleRename(act.id, act.title)}
+                onDownloadPdf={() => handleDownloadPdf(act)}
+                onDownloadExcel={() => handleDownloadExcel(act)}
                 isDeleting={deleteActMutation.isPending && deleteActMutation.variables === act.id}
+                selected={selectedActId === act.id}
+                onSelect={() => setSelectedActId(act.id)}
               />
             ))}
           </div>
         )}
       </div>
     </div>
+    </>
   );
 }
 
