@@ -199,6 +199,8 @@ export function SequenceCard({
   onSurfaceVariant,
   onClick,
   onDelete,
+  onDownloadPdf,
+  onDownloadExcel,
   isDeleting,
 }: {
   sequence: ActivitySequence;
@@ -207,6 +209,8 @@ export function SequenceCard({
   onSurfaceVariant: string;
   onClick: () => void;
   onDelete: () => void;
+  onDownloadPdf?: () => void;
+  onDownloadExcel?: () => void;
   isDeleting: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -330,6 +334,7 @@ export function SequenceCard({
         </button>
         {menuOpen && (
           <div
+            onClick={(e) => e.stopPropagation()}
             style={{
               position: "fixed",
               top: menuPos.top,
@@ -339,32 +344,28 @@ export function SequenceCard({
               borderRadius: "0.75rem",
               boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
               zIndex: 9999,
-              minWidth: "140px",
+              minWidth: "160px",
               overflow: "hidden",
+              padding: "0.25rem",
             }}
           >
-            <button
-              onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(); }}
-              disabled={isDeleting}
-              style={{
-                width: "100%",
-                padding: "0.625rem 1rem",
-                background: "transparent",
-                border: "none",
-                color: "var(--danger)",
-                fontSize: "0.82rem",
-                fontFamily: "var(--font-dm-sans)",
-                fontWeight: 600,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                textAlign: "left",
-              }}
-            >
-              {isDeleting ? <Spinner size="sm" color="current" /> : <Trash2 size={13} />}
-              Eliminar
-            </button>
+            <MenuButton icon={<ExternalLink size={15} />} label="Abrir" onClick={() => { setMenuOpen(false); onClick(); }} />
+            {(onDownloadPdf || onDownloadExcel) && (
+              <>
+                <MenuDivider />
+                <MenuButtonWithSubmenu
+                  icon={<Download size={15} />}
+                  label="Descargar"
+                  menuPos={menuPos}
+                  items={[
+                    { icon: <FileDown size={15} />, label: "PDF", onClick: () => { setMenuOpen(false); onDownloadPdf?.(); } },
+                    { icon: <FileSpreadsheet size={15} />, label: "Excel", onClick: () => { setMenuOpen(false); onDownloadExcel?.(); } },
+                  ]}
+                />
+              </>
+            )}
+            <MenuDivider />
+            <MenuButton icon={isDeleting ? <Spinner size="sm" color="current" /> : <Trash2 size={15} />} label="Eliminar" onClick={() => { setMenuOpen(false); onDelete(); }} danger disabled={isDeleting} />
           </div>
         )}
       </div>

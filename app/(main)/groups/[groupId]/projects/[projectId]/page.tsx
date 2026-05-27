@@ -138,6 +138,47 @@ export default function ProjectDetailPage() {
     setRenamingActId(actId);
   };
 
+  const handleSeqDownloadPdf = async (seq: { id: string; name: string; learning_goal?: string }) => {
+    const { getActivities } = await import("@/app/api-actions");
+    const acts = await getActivities(groupId, projectId, seq.id);
+    const { pdf } = await import("@react-pdf/renderer");
+    const { SequenceExportPDF } = await import("@/app/components/pdf/SequenceExportPDF");
+    const blob = await pdf(<SequenceExportPDF sequence={seq} activities={acts} />).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${seq.name.replace(/\s+/g, "_").slice(0, 60)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSeqDownloadExcel = async (seq: { id: string; name: string }) => {
+    const { getActivities } = await import("@/app/api-actions");
+    const { parseContent } = await import("@/app/components/activity-content");
+    const acts = await getActivities(groupId, projectId, seq.id);
+    const bom = "﻿";
+    const headers = ["Secuencia", "N°", "Actividad", "Momento", "Duración", "Meta", "Actividad desc.", "Rol docente", "Recursos"];
+    const rows: string[][] = [];
+    acts.forEach((act, idx) => {
+      const parsed = parseContent(act.raw_content);
+      if (parsed?.type === "planificacion") {
+        parsed.momentos.forEach((m) => {
+          rows.push([seq.name, String(idx + 1), act.title, m.momento ?? "", m.duracion ?? "", m.meta_aprendizaje ?? "", m.actividad ?? "", m.rol_docente ?? "", m.recursos ?? ""]);
+        });
+      } else {
+        rows.push([seq.name, String(idx + 1), act.title, "", "", "", act.raw_content ?? "", "", ""]);
+      }
+    });
+    const csv = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${seq.name.replace(/\s+/g, "_").slice(0, 60)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleDownloadPdf = async (act: { title: string; raw_content?: string }) => {
     const { pdf } = await import("@react-pdf/renderer");
     const { ActivityPDF } = await import("@/app/components/pdf/ActivityPDF");
@@ -377,6 +418,8 @@ export default function ProjectDetailPage() {
                     onSurfaceVariant={onSurfaceVariant}
                     onClick={() => router.push(`/groups/${groupId}/projects/${projectId}/sequences/${seq.id}`)}
                     onDelete={() => handleDeleteSeq(seq.id, seq.name)}
+                    onDownloadPdf={() => handleSeqDownloadPdf(seq)}
+                    onDownloadExcel={() => handleSeqDownloadExcel(seq)}
                     isDeleting={deleteSeqMutation.isPending && deleteSeqMutation.variables === seq.id}
                   />
                 ))}
