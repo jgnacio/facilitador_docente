@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState, memo } from "react";
 import { flushSync } from "react-dom";
 
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Card } from "@heroui/react";
-import { getChatSessions, deleteChatSession, getSessionMessages, getProject, getGroup, getSequences, getActivities, type ChatSession, type PdfRef } from "../../api-actions";
-import { BookOpen, HeartHandshake, Layers, Lightbulb, Sparkles, Plus, Mic, Hammer, SendHorizontal, RotateCcw, ChevronDown, ChevronRight, FolderOpen, FileText, X, PanelLeftOpen } from "lucide-react";
+import { getChatSessions, deleteChatSession, getSessionMessages, getProject, getGroup, getSequences, getActivities, getAlumnosByGroup, type ChatSession, type PdfRef } from "../../api-actions";
+import { BookOpen, HeartHandshake, Layers, Lightbulb, Sparkles, Plus, Mic, Hammer, SendHorizontal, RotateCcw, ChevronDown, ChevronRight, FolderOpen, FileText, X, PanelLeftOpen, Users } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -210,6 +211,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
   const hasProjectCtx = Boolean(ctxGroupId && ctxProjectId);
 
   const [showProjectPanel, setShowProjectPanel] = useState(hasProjectCtx);
+  const [showGroupPanel, setShowGroupPanel]     = useState(false);
 
   const bottomRef                     = useRef<HTMLDivElement>(null);
   const scrollContainerRef            = useRef<HTMLDivElement>(null);
@@ -218,6 +220,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
   const { getToken }                  = useAuth();
   const { user }                      = useUser();
   const { resolvedTheme }             = useTheme();
+  const router                        = useRouter();
 
 
   const primaryColor  = "var(--primary)";
@@ -402,19 +405,32 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
           </button>
           {hasProjectCtx && (
             <button
-              onClick={() => setShowProjectPanel((v) => !v)}
+              onClick={() => { setShowProjectPanel((v) => !v); setShowGroupPanel(false); }}
               title="Panel de proyecto"
               className="flex items-center justify-center rounded-xl transition-all active:scale-95"
               style={{
-                width: "36px",
-                height: "36px",
+                width: "36px", height: "36px",
                 color: showProjectPanel ? "var(--primary)" : "var(--on-surface-variant)",
                 background: showProjectPanel ? "color-mix(in srgb, var(--primary) 12%, transparent)" : "transparent",
-                border: "none",
-                cursor: "pointer",
+                border: "none", cursor: "pointer",
               }}
             >
               <PanelLeftOpen size={16} />
+            </button>
+          )}
+          {hasProjectCtx && (
+            <button
+              onClick={() => { setShowGroupPanel((v) => !v); setShowProjectPanel(false); }}
+              title="Ver grupo y alumnos"
+              className="flex items-center justify-center rounded-xl transition-all active:scale-95"
+              style={{
+                width: "36px", height: "36px",
+                color: showGroupPanel ? "var(--primary)" : "var(--on-surface-variant)",
+                background: showGroupPanel ? "color-mix(in srgb, var(--primary) 12%, transparent)" : "transparent",
+                border: "none", cursor: "pointer",
+              }}
+            >
+              <Users size={16} />
             </button>
           )}
         </div>
@@ -447,6 +463,39 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
                   </button>
                 </div>
                 <ProjectContextContent groupId={ctxGroupId!} projectId={ctxProjectId!} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Expanded group panel */}
+        <AnimatePresence>
+          {showGroupPanel && hasProjectCtx && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 252, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 320, damping: 30 }}
+              style={{ overflow: "hidden", borderLeft: "1px solid var(--border-subtle)", background: "var(--surface-container-low)" }}
+            >
+              <div style={{ width: "252px", height: "100%", display: "flex", flexDirection: "column" }}>
+                <div
+                  className="flex items-center justify-between px-3 flex-shrink-0"
+                  style={{ height: "40px", borderBottom: "1px solid var(--border-subtle)" }}
+                >
+                  <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-display)" }}>
+                    Grupo
+                  </span>
+                  <button
+                    onClick={() => setShowGroupPanel(false)}
+                    style={{ color: "var(--on-surface-variant)", background: "none", border: "none", cursor: "pointer", lineHeight: 1 }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+                <GroupContextContent groupId={ctxGroupId!} />
               </div>
             </motion.div>
           )}
@@ -1876,5 +1925,79 @@ function SessionSidebar({
         )}
       </div>
     </motion.div>
+  );
+}
+
+// ── GroupContextContent ───────────────────────────────────────────────────────
+
+function GroupContextContent({ groupId }: { groupId: string }) {
+  const { data: group, isPending: loadingGroup } = useQuery({
+    queryKey: ["group", groupId],
+    queryFn: () => getGroup(groupId),
+    enabled: Boolean(groupId),
+  });
+  const { data: alumnos = [], isPending: loadingAlumnos } = useQuery({
+    queryKey: ["alumnos-by-group", groupId],
+    queryFn: () => getAlumnosByGroup(groupId),
+    enabled: Boolean(groupId),
+  });
+
+  const loading = loadingGroup || loadingAlumnos;
+
+  return (
+    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      {loading ? (
+        <div className="flex justify-center py-6">
+          <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: "var(--primary)" }}>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      ) : (
+        <>
+          {group && (
+            <div className="space-y-1">
+              <p className="font-bold text-sm leading-snug" style={{ color: "var(--on-surface)", fontFamily: "var(--font-display)" }}>
+                {group.name}
+              </p>
+              <p className="text-xs" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)" }}>
+                {group.stage} · Nivel {group.level}
+              </p>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--primary)", fontFamily: "var(--font-display)" }}>
+              Alumnos ({alumnos.length})
+            </p>
+            {alumnos.length === 0 ? (
+              <p className="text-xs" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)" }}>
+                Sin alumnos asignados
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {alumnos.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center gap-2 rounded-xl px-2.5 py-2"
+                    style={{ background: "var(--surface-container)", border: "1px solid rgba(127,127,127,0.08)" }}
+                  >
+                    <div
+                      className="flex items-center justify-center rounded-full flex-shrink-0 text-xs font-bold"
+                      style={{ width: "26px", height: "26px", background: "var(--primary-subtle)", color: "var(--primary)", fontFamily: "var(--font-display)" }}
+                    >
+                      {a.nombre_completo.charAt(0).toUpperCase()}
+                    </div>
+                    <p className="text-xs leading-snug truncate" style={{ color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)", fontWeight: 500 }}>
+                      {a.nombre_completo}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
