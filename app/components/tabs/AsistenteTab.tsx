@@ -210,7 +210,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
   const ctxProjectId = ctxMatch?.[2]?.trim();
   const hasProjectCtx = Boolean(ctxGroupId && ctxProjectId);
 
-  const [showProjectPanel, setShowProjectPanel] = useState(false);
+  const [showProjectPanel, setShowProjectPanel] = useState(hasProjectCtx);
 
   const bottomRef                     = useRef<HTMLDivElement>(null);
   const scrollContainerRef            = useRef<HTMLDivElement>(null);

@@ -184,6 +184,7 @@ export default function ProjectDetailPage() {
     const ctx = [
       `[ctx: group_id=${groupId}, project_id=${projectId}]`,
       `Proyecto integrador: "${project?.name}". Grupo: ${group?.name} (${group?.stage}, nivel ${group?.level}).`,
+      project?.duration_weeks ? `Duración del proyecto: ${project.duration_weeks} semanas.` : "",
       project?.purpose ? `Propósito: ${project.purpose}.` : "",
     ].filter(Boolean).join(" ");
     const label = `Proyecto: ${project?.name ?? "..."} · Grupo: ${group?.name ?? "..."} · Nivel ${group?.level ?? ""}`;
@@ -197,6 +198,7 @@ export default function ProjectDetailPage() {
     const ctx = [
       `[ctx: group_id=${groupId}, project_id=${projectId}]`,
       `Proyecto integrador: "${project?.name}". Grupo: ${group?.name} (${group?.stage}, nivel ${group?.level}).`,
+      project?.duration_weeks ? `Duración del proyecto: ${project.duration_weeks} semanas.` : "",
       project?.purpose ? `Propósito del proyecto: ${project.purpose}.` : "",
       "Quiero crear una actividad suelta (no pertenece a ninguna secuencia).",
       actList,
@@ -285,12 +287,33 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* ── Header ───────────────────────────────────────────────────────────── */}
-      <h1 style={{ fontSize: "2rem", fontWeight: 400, fontFamily: "var(--font-fraunces)", color: onSurface, letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: "2rem" }}>
+      <h1 style={{ fontSize: "2rem", fontWeight: 400, fontFamily: "var(--font-fraunces)", color: onSurface, letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: "0.75rem" }}>
         {loadingProject ? <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{color: "var(--warning, #f59e0b)"}}>
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg> : (project?.name ?? "Proyecto")}
       </h1>
+
+      {/* ── Project meta ─────────────────────────────────────────────────── */}
+      {!loadingProject && project && (
+        <div className="flex flex-wrap items-center gap-2 mb-6" style={{ fontFamily: "var(--font-dm-sans)" }}>
+          {group && (
+            <span className="text-xs font-medium px-2.5 py-1 rounded-full" style={{ background: "var(--surface-container-low)", color: onSurfaceVariant }}>
+              {group.name} · {group.stage} · Nivel {group.level}
+            </span>
+          )}
+          {project.duration_weeks && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: "var(--primary-subtle)", color: "var(--primary)" }}>
+              {project.duration_weeks} semanas
+            </span>
+          )}
+          {project.purpose && (
+            <p className="w-full text-sm mt-1" style={{ color: onSurfaceVariant, opacity: 0.85, lineHeight: 1.55 }}>
+              {project.purpose}
+            </p>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-4">
