@@ -15,6 +15,7 @@ import {
   deleteSequence,
   deleteActivity,
   updateActivity,
+  updateSequence,
 } from "@/app/api-actions";
 import { SequenceCard, ActivityCard } from "@/app/components/cards";
 import { useConfirmModal, RenameModal } from "@/app/components/ui/confirm-modal";
@@ -136,6 +137,24 @@ export default function ProjectDetailPage() {
   const handleRenameAct = (actId: string, currentTitle: string) => {
     setRenameValue(currentTitle);
     setRenamingActId(actId);
+  };
+
+  // ── Sequence rename ──
+  const [renamingSeqId, setRenamingSeqId] = useState<string | null>(null);
+  const [renameSeqValue, setRenameSeqValue] = useState("");
+
+  const renameSeqMutation = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      updateSequence(groupId, projectId, id, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sequences", groupId, projectId] });
+      setRenamingSeqId(null);
+    },
+  });
+
+  const handleRenameSeq = (seqId: string, currentName: string) => {
+    setRenameSeqValue(currentName);
+    setRenamingSeqId(seqId);
   };
 
   const handleSeqDownloadPdf = async (seq: { id: string; name: string; learning_goal?: string }) => {
@@ -311,6 +330,16 @@ export default function ProjectDetailPage() {
         onCancel={() => setRenamingActId(null)}
       />
     )}
+    {renamingSeqId && (
+      <RenameModal
+        title="Renombrar secuencia"
+        value={renameSeqValue}
+        onChange={setRenameSeqValue}
+        isPending={renameSeqMutation.isPending}
+        onConfirm={() => renameSeqMutation.mutate({ id: renamingSeqId, name: renameSeqValue.trim() })}
+        onCancel={() => setRenamingSeqId(null)}
+      />
+    )}
     <div style={{ padding: "2rem 2.5rem", maxWidth: "1100px", margin: "0 auto" }}>
       {/* ── Breadcrumb ───────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 mb-6 flex-wrap" style={{ fontSize: "0.82rem", fontFamily: "var(--font-dm-sans)", color: onSurfaceVariant }}>
@@ -418,6 +447,7 @@ export default function ProjectDetailPage() {
                     onSurfaceVariant={onSurfaceVariant}
                     onClick={() => router.push(`/groups/${groupId}/projects/${projectId}/sequences/${seq.id}`)}
                     onDelete={() => handleDeleteSeq(seq.id, seq.name)}
+                    onRename={() => handleRenameSeq(seq.id, seq.name)}
                     onDownloadPdf={() => handleSeqDownloadPdf(seq)}
                     onDownloadExcel={() => handleSeqDownloadExcel(seq)}
                     isDeleting={deleteSeqMutation.isPending && deleteSeqMutation.variables === seq.id}

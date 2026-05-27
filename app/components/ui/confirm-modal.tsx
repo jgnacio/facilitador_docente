@@ -175,12 +175,14 @@ export function RenameModal({
   isPending,
   onConfirm,
   onCancel,
+  title = "Renombrar actividad",
 }: {
   value: string;
   onChange: (v: string) => void;
   isPending: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  title?: string;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -213,7 +215,7 @@ export function RenameModal({
         }}
       >
         <p style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
-          Renombrar actividad
+          {title}
         </p>
         <input
           autoFocus

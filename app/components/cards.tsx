@@ -199,6 +199,7 @@ export function SequenceCard({
   onSurfaceVariant,
   onClick,
   onDelete,
+  onRename,
   onDownloadPdf,
   onDownloadExcel,
   isDeleting,
@@ -209,6 +210,7 @@ export function SequenceCard({
   onSurfaceVariant: string;
   onClick: () => void;
   onDelete: () => void;
+  onRename?: () => void;
   onDownloadPdf?: () => void;
   onDownloadExcel?: () => void;
   isDeleting: boolean;
@@ -349,19 +351,19 @@ export function SequenceCard({
               padding: "0.25rem",
             }}
           >
-            <MenuButton icon={<ExternalLink size={15} />} label="Abrir" onClick={() => { setMenuOpen(false); onClick(); }} />
-            {(onDownloadPdf || onDownloadExcel) && (
+            <MenuButtonWithSubmenu
+              icon={<Download size={15} />}
+              label="Descargar"
+              menuPos={menuPos}
+              items={[
+                { icon: <FileDown size={15} />, label: "PDF", onClick: () => { setMenuOpen(false); onDownloadPdf?.(); } },
+                { icon: <FileSpreadsheet size={15} />, label: "Excel", onClick: () => { setMenuOpen(false); onDownloadExcel?.(); } },
+              ]}
+            />
+            {onRename && (
               <>
                 <MenuDivider />
-                <MenuButtonWithSubmenu
-                  icon={<Download size={15} />}
-                  label="Descargar"
-                  menuPos={menuPos}
-                  items={[
-                    { icon: <FileDown size={15} />, label: "PDF", onClick: () => { setMenuOpen(false); onDownloadPdf?.(); } },
-                    { icon: <FileSpreadsheet size={15} />, label: "Excel", onClick: () => { setMenuOpen(false); onDownloadExcel?.(); } },
-                  ]}
-                />
+                <MenuButton icon={<Pencil size={15} />} label="Renombrar" onClick={() => { setMenuOpen(false); onRename(); }} />
               </>
             )}
             <MenuDivider />

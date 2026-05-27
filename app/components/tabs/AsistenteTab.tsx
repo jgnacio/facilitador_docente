@@ -198,14 +198,13 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
   const [statusLabel, setStatusLabel] = useState("Pensando…");
   const [sessionReady, setReady]      = useState(false);
   const [streamingText, setStreamingText] = useState("");
-  const [showContext, setShowContext]  = useState(!!contextLabel);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [sessions, setSessions]       = useState<ChatSession[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Parse group_id and project_id from context message
-  const ctxMatch = contextMessage?.match(/group_id=([^,\]]+)[^[]*project_id=([^\]]+)/);
+  const ctxMatch = contextMessage?.match(/group_id=([^,\]\s]+)[^[]*project_id=([^,\]\s]+)/);
   const ctxGroupId = ctxMatch?.[1]?.trim();
   const ctxProjectId = ctxMatch?.[2]?.trim();
   const hasProjectCtx = Boolean(ctxGroupId && ctxProjectId);
@@ -457,35 +456,6 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
       {/* ── Main Chat Area ──────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-h-0">
 
-        {/* Context badge (normal flow) */}
-        {showContext && contextLabel && (
-          <div
-            className="flex items-center justify-between px-4 flex-shrink-0"
-            style={{
-              height: "36px",
-              background: "color-mix(in srgb, var(--primary) 8%, var(--surface))",
-              borderBottom: "1px solid color-mix(in srgb, var(--primary) 15%, transparent)",
-            }}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-              </svg>
-              <span className="text-xs truncate" style={{ color: "var(--primary)", fontFamily: "var(--font-dm-sans)", fontWeight: 600 }}>
-                {contextLabel}
-              </span>
-            </div>
-            <button
-              onClick={() => setShowContext(false)}
-              className="flex-shrink-0"
-              style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", lineHeight: 1 }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          </div>
-        )}
 
         {/* Messages / Welcome */}
         <div
