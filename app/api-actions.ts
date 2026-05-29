@@ -37,6 +37,17 @@ export type Alumno = {
   group_id?: string;
 };
 
+export type StudentReport = {
+  id: number;
+  alumno_id: number;
+  user_id: string;
+  diagnostico: string;
+  recomendaciones_especialista: string;
+  informe_pdf_url?: string;
+  created_at: string;
+  updated_at: string;
+};
+
 // ── Planificaciones ───────────────────────────────────────────────────────────
 // @deprecated Usar la jerarquía EBI (grupos → proyectos → secuencias → actividades).
 // Mantenido por compatibilidad con la pestaña "asistente".
@@ -201,6 +212,101 @@ export async function updatePlanificacion(id: number, data: {
   }
 }
 
+// ── Informes NEE ─────────────────────────────────────────────────────────────
+
+export async function getInformesNEE(alumnoId: number): Promise<StudentReport[]> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${alumnoId}/informes`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function createInformeNEE(
+  alumnoId: number,
+  data: { diagnostico: string; recomendaciones_especialista: string },
+): Promise<StudentReport | null> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${alumnoId}/informes`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function updateInformeNEE(
+  alumnoId: number,
+  reportId: number,
+  data: { diagnostico?: string; recomendaciones_especialista?: string },
+): Promise<StudentReport | null> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${alumnoId}/informes/${reportId}`, {
+      method: "PUT",
+      headers: await authHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteInformeNEE(alumnoId: number, reportId: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${alumnoId}/informes/${reportId}`, {
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function uploadInformePDF(alumnoId: number, reportId: number, formData: FormData): Promise<StudentReport | null> {
+  try {
+    // 1. Obtener signed URL de GCS desde el backend
+    const signedRes = await fetch(`${API_URL}/alumnos/${alumnoId}/informes/${reportId}/pdf/signed-url`, {
+      method: "POST",
+      headers: await authHeaders(),
+    });
+    if (!signedRes.ok) return null;
+    const { upload_url, final_url } = await signedRes.json() as { upload_url: string; final_url: string };
+
+    // 2. Subir el PDF directo a GCS (sin pasar por Cloud Run)
+    const file = formData.get("file") as File;
+    if (!file) return null;
+    const gcsRes = await fetch(upload_url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/pdf" },
+      body: file,
+    });
+    if (!gcsRes.ok) return null;
+
+    // 3. Guardar la URL final en el backend
+    const updateRes = await fetch(`${API_URL}/alumnos/${alumnoId}/informes/${reportId}`, {
+      method: "PUT",
+      headers: await authHeaders(),
+      body: JSON.stringify({ informe_pdf_url: final_url }),
+    });
+    if (!updateRes.ok) return null;
+    return updateRes.json();
+  } catch {
+    return null;
+  }
+}
+
 // ── Agente chat ───────────────────────────────────────────────────────────────
 
 export type ChatSession = {
@@ -350,6 +456,42 @@ export async function createSubscriptionCheckout(planId: string): Promise<{ init
     return res.json();
   } catch {
     return null;
+  }
+}
+
+export async function cancelSubscription(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/subscriptions/me/cancel`, {
+      method: "PUT",
+      headers: await authHeaders(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ── Control de acceso al agente ───────────────────────────────────────────────
+
+export type AgentAccess = {
+  has_access: boolean;
+  kind: "individual" | "institutional" | null;
+  reason: "no_subscription" | "institution_unpaid" | null;
+  message: string | null;
+};
+
+export async function getAgentAccess(): Promise<AgentAccess> {
+  try {
+    const res = await fetch(`${API_URL}/access/agent`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
+    if (!res.ok) {
+      return { has_access: false, kind: null, reason: "no_subscription", message: null };
+    }
+    return res.json();
+  } catch {
+    return { has_access: false, kind: null, reason: "no_subscription", message: null };
   }
 }
 

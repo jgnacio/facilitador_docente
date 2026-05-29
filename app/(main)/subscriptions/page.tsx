@@ -9,14 +9,16 @@ import {
   Chip,
   Spinner,
 } from "@heroui/react";
-import { useQuery } from "@tanstack/react-query";
-import { Sparkles, CheckCircle2, ExternalLink } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Sparkles, CheckCircle2, ExternalLink, XCircle } from "lucide-react";
 import {
   getSubscriptionPlans,
   getActiveSubscription,
   createSubscriptionCheckout,
+  cancelSubscription,
   type SubscriptionPlan,
 } from "@/app/api-actions";
+import { useConfirmModal } from "@/app/components/ui/confirm-modal";
 
 const PERIOD_LABEL: Record<string, string> = {
   monthly:   "Mensual",
@@ -37,13 +39,39 @@ function formatDate(iso?: string) {
 }
 
 export default function SubscriptionsPage() {
+  const queryClient = useQueryClient();
+  const { confirm, modal } = useConfirmModal();
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const { data: subscription, isPending: loadingSub } = useQuery({
     queryKey: ["active-subscription"],
     queryFn: getActiveSubscription,
   });
+
+  const handleCancel = () => {
+    confirm({
+      title: "¿Cancelar suscripción?",
+      message:
+        "Mantendrás acceso hasta el final del período actual. Después, perderás el acceso al agente y a las funciones premium.",
+      confirmLabel: "Sí, cancelar",
+      variant: "warning",
+      onConfirm: async () => {
+        setCancelling(true);
+        setCancelError(null);
+        const ok = await cancelSubscription();
+        setCancelling(false);
+        if (ok) {
+          queryClient.invalidateQueries({ queryKey: ["active-subscription"] });
+          queryClient.invalidateQueries({ queryKey: ["subscription-plans"] });
+        } else {
+          setCancelError("No se pudo cancelar la suscripción. Intentá de nuevo.");
+        }
+      },
+    });
+  };
 
   const { data: plans = [], isPending: loadingPlans } = useQuery({
     queryKey: ["subscription-plans"],
@@ -132,6 +160,26 @@ export default function SubscriptionsPage() {
                 </p>
               </div>
             </div>
+
+            {subscription.status !== "cancelled" && (
+              <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  isDisabled={cancelling}
+                  onPress={handleCancel}
+                  style={{ color: "var(--danger)" }}
+                >
+                  {cancelling ? <Spinner size="sm" /> : <XCircle size={14} />}
+                  Cancelar suscripción
+                </Button>
+                {cancelError && (
+                  <p className="text-xs mt-2" style={{ color: "var(--danger)", fontFamily: "var(--font-body)" }}>
+                    {cancelError}
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -212,6 +260,8 @@ export default function SubscriptionsPage() {
           )}
         </div>
       )}
+
+      {modal}
     </div>
   );
 }

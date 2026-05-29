@@ -9,7 +9,8 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getAlumnos, getGroups, createAlumno, updateAlumno, deleteAlumno,
-  type Alumno, type Group,
+  getInformesNEE, createInformeNEE, updateInformeNEE, deleteInformeNEE, uploadInformePDF,
+  type Alumno, type Group, type StudentReport,
 } from "../../api-actions";
 import { useConfirmModal } from "@/app/components/ui/confirm-modal";
 
@@ -392,6 +393,10 @@ function AlumnoForm({ alumno, groups, onBack, onSaved }: {
           />
         </TextField>
 
+        {isEdit && alumno && (
+          <InformesNEESection alumnoId={alumno.id} />
+        )}
+
         {error && (
           <Chip color="danger" variant="soft" className="w-full justify-start px-3 py-2 text-sm rounded-xl h-auto">
             {error}
@@ -609,6 +614,293 @@ function GroupAssignModal({ alumno, groups, currentGroupId, onClose, onAssign, i
             )}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Informes NEE ─────────────────────────────────────────────────────────────
+
+type NEEView = "list" | "create" | "edit";
+
+function InformesNEESection({ alumnoId }: { alumnoId: number }) {
+  const queryClient = useQueryClient();
+  const { confirm, modal: confirmModal } = useConfirmModal();
+  const [view, setView] = useState<NEEView>("list");
+  const [editing, setEditing] = useState<StudentReport | null>(null);
+
+  const { data: informes = [], isPending } = useQuery({
+    queryKey: ["informes-nee", alumnoId],
+    queryFn: () => getInformesNEE(alumnoId),
+  });
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["informes-nee", alumnoId] });
+
+  const deleteMutation = useMutation({
+    mutationFn: (reportId: number) => deleteInformeNEE(alumnoId, reportId),
+    onSuccess: refresh,
+  });
+
+  const handleDelete = (r: StudentReport) => {
+    confirm({
+      title: "Eliminar informe",
+      message: "¿Estás seguro de que deseas eliminar este informe? Esta acción no se puede deshacer.",
+      onConfirm: () => deleteMutation.mutate(r.id),
+    });
+  };
+
+  if (view === "create") {
+    return (
+      <InformeNEEForm
+        alumnoId={alumnoId}
+        onBack={() => setView("list")}
+        onSaved={() => { setView("list"); refresh(); }}
+      />
+    );
+  }
+
+  if (view === "edit" && editing) {
+    return (
+      <InformeNEEForm
+        alumnoId={alumnoId}
+        informe={editing}
+        onBack={() => { setView("list"); setEditing(null); }}
+        onSaved={() => { setView("list"); setEditing(null); refresh(); }}
+      />
+    );
+  }
+
+  return (
+    <>
+      {confirmModal}
+      <div
+        style={{
+          border: "1.5px solid var(--outline-variant)",
+          borderRadius: "1rem",
+          padding: "1rem 1.25rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem",
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
+              Necesidades Educativas Especiales
+            </p>
+            <p style={{ fontSize: "0.72rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", marginTop: "0.1rem" }}>
+              Informes del especialista · historial
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onPress={() => setView("create")}>
+            + Agregar informe
+          </Button>
+        </div>
+
+        {isPending ? (
+          <div className="flex justify-center py-2">
+            <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: "var(--primary)" }}>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+        ) : informes.length === 0 ? (
+          <p style={{ fontSize: "0.75rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", textAlign: "center", padding: "0.5rem 0" }}>
+            Sin informes NEE registrados.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {informes.map((r) => (
+              <div
+                key={r.id}
+                style={{
+                  background: "var(--surface-container-low)",
+                  borderRadius: "0.875rem",
+                  padding: "0.75rem 1rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.4rem",
+                }}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
+                      {r.diagnostico}
+                    </p>
+                    <p style={{ fontSize: "0.72rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", marginTop: "0.25rem", lineHeight: 1.45 }}>
+                      {r.recomendaciones_especialista.length > 120
+                        ? r.recomendaciones_especialista.slice(0, 120) + "…"
+                        : r.recomendaciones_especialista}
+                    </p>
+                    <p style={{ fontSize: "0.65rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", marginTop: "0.35rem", opacity: 0.6 }}>
+                      {new Date(r.updated_at).toLocaleDateString("es-UY", { day: "2-digit", month: "short", year: "numeric" })}
+                      {r.informe_pdf_url && " · PDF adjunto"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => { setEditing(r); setView("edit"); }}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                      aria-label="Editar informe"
+                    >
+                      <EditIcon />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(r)}
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-all"
+                      aria-label="Eliminar informe"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function InformeNEEForm({
+  alumnoId,
+  informe,
+  onBack,
+  onSaved,
+}: {
+  alumnoId: number;
+  informe?: StudentReport;
+  onBack: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = Boolean(informe);
+  const [diagnostico, setDiagnostico] = useState(informe?.diagnostico ?? "");
+  const [recomendaciones, setRecomendaciones] = useState(informe?.recomendaciones_especialista ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+
+  const save = async () => {
+    setTouched(true);
+    if (!diagnostico.trim() || !recomendaciones.trim()) return;
+    setSaving(true);
+    setError("");
+
+    let result: StudentReport | null = null;
+    if (isEdit && informe) {
+      result = await updateInformeNEE(alumnoId, informe.id, {
+        diagnostico: diagnostico.trim(),
+        recomendaciones_especialista: recomendaciones.trim(),
+      });
+    } else {
+      result = await createInformeNEE(alumnoId, {
+        diagnostico: diagnostico.trim(),
+        recomendaciones_especialista: recomendaciones.trim(),
+      });
+    }
+
+    if (!result) {
+      setSaving(false);
+      setError("Error al guardar. Verificá que la API esté activa.");
+      return;
+    }
+
+    if (pdfFile) {
+      setUploadingPdf(true);
+      const formData = new FormData();
+      formData.append("file", pdfFile);
+      await uploadInformePDF(alumnoId, result.id, formData);
+      setUploadingPdf(false);
+    }
+
+    setSaving(false);
+    onSaved();
+  };
+
+  return (
+    <div
+      style={{
+        border: "1.5px solid var(--outline-variant)",
+        borderRadius: "1rem",
+        padding: "1rem 1.25rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.875rem",
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onBack}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--on-surface-variant)", display: "flex", alignItems: "center" }}
+          aria-label="Volver"
+        >
+          <BackIcon />
+        </button>
+        <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
+          {isEdit ? "Editar informe NEE" : "Nuevo informe NEE"}
+        </p>
+      </div>
+
+      <TextField
+        fullWidth
+        isRequired
+        isInvalid={touched && !diagnostico.trim()}
+        value={diagnostico}
+        onChange={setDiagnostico}
+      >
+        <Label>Diagnóstico</Label>
+        <Input placeholder="Ej: Trastorno del Espectro Autista (TEA), Dislexia, TDAH…" />
+        {touched && !diagnostico.trim() && <FieldError>El diagnóstico es requerido.</FieldError>}
+      </TextField>
+
+      <TextField
+        fullWidth
+        isRequired
+        isInvalid={touched && !recomendaciones.trim()}
+        value={recomendaciones}
+        onChange={setRecomendaciones}
+      >
+        <Label>Recomendaciones del especialista</Label>
+        <TextArea
+          placeholder="Ej: Usar apoyos visuales, dar tiempo extra, consignas cortas y claras, trabajo en grupos pequeños…"
+          rows={4}
+        />
+        {touched && !recomendaciones.trim() && <FieldError>Las recomendaciones son requeridas.</FieldError>}
+      </TextField>
+
+      <div>
+        <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--on-surface-variant)", marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" }}>
+          Informe PDF <span style={{ fontWeight: 400, opacity: 0.6 }}>(opcional — solo para referencia)</span>
+        </label>
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
+          style={{ fontSize: "0.8rem", color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}
+        />
+        {informe?.informe_pdf_url && !pdfFile && (
+          <p style={{ fontSize: "0.68rem", color: "var(--on-surface-variant)", marginTop: "0.25rem", fontFamily: "var(--font-dm-sans)" }}>
+            PDF ya adjunto — subí uno nuevo para reemplazarlo.
+          </p>
+        )}
+      </div>
+
+      {error && (
+        <Chip color="danger" variant="soft" className="w-full justify-start px-3 py-2 text-sm rounded-xl h-auto">
+          {error}
+        </Chip>
+      )}
+
+      <div className="flex gap-3 pt-1">
+        <Button variant="tertiary" fullWidth onPress={onBack}>Cancelar</Button>
+        <Button variant="primary" fullWidth isPending={saving || uploadingPdf} onPress={save}>
+          {({ isPending }) => isPending
+            ? <><Spinner size="sm" color="current" /> {uploadingPdf ? "Subiendo PDF…" : "Guardando…"}</>
+            : isEdit ? "Guardar cambios" : "Guardar informe"}
+        </Button>
       </div>
     </div>
   );
