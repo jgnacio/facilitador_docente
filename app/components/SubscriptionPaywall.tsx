@@ -52,8 +52,8 @@ export function SubscriptionPaywall({ access }: Props) {
               El administrador de tu institución debe pagar el ciclo de facturación para reactivar las licencias.
             </p>
           ) : (
-            <Link href="/subscriptions" passHref legacyBehavior>
-              <Button variant="primary" fullWidth as="a">
+            <Link href="/subscriptions">
+              <Button variant="primary" fullWidth>
                 <Sparkles size={16} />
                 Ver planes disponibles
               </Button>
