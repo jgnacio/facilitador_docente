@@ -54,7 +54,7 @@ export default function SubscriptionSuccessPage() {
           >
             {status === "polling" && "Procesando tu pago…"}
             {status === "active" && "¡Suscripción activa!"}
-            {status === "timeout" && "El pago está demorando"}
+            {status === "timeout" && "El pago está siendo procesado"}
           </h2>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 pb-6">
@@ -64,7 +64,18 @@ export default function SubscriptionSuccessPage() {
           >
             {status === "polling" && "Mercado Pago está confirmando la transacción. Esto puede demorar unos segundos."}
             {status === "active" && "Ya podés usar el agente y todas las funciones."}
-            {status === "timeout" && "Si pagaste correctamente, la suscripción debería activarse en breve. Revisá esta página más tarde."}
+            {status === "timeout" && (
+              <>
+                ¡No te preocupes! Estamos en nuestros primeros días y a veces la confirmación tarda un poco más de lo esperado. Escribinos a{" "}
+                <a
+                  href="mailto:facilitadordocenteuy@gmail.com?subject=Mi%20suscripción%20no%20se%20activó"
+                  style={{ color: "var(--primary)", textDecoration: "underline" }}
+                >
+                  facilitadordocenteuy@gmail.com
+                </a>{" "}
+                y te lo solucionamos enseguida 🙌
+              </>
+            )}
           </p>
           {status === "active" && (
             <Button variant="primary" fullWidth onPress={() => router.push("/asistente")}>

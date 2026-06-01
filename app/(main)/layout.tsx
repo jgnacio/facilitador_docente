@@ -124,7 +124,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </button>
 
           <button
-            onClick={() => window.open("mailto:ignacio.gomez@bit-a.com?subject=Ayuda%20-%20Facilitador%20Docente", "_blank")}
+            onClick={() => window.open("mailto:facilitadordocenteuy@gmail.com?subject=Ayuda%20-%20Facilitador%20Docente", "_blank")}
             className="hidden md:flex items-center justify-center rounded-xl p-2 transition-all"
             style={{ color: inactiveText }}
             title="Ayuda"
