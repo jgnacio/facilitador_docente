@@ -235,7 +235,7 @@ export default function SubscriptionsPage() {
                         ${plan.price_usd.toFixed(2)}
                       </span>
                       <span className="text-sm ml-1" style={{ color: "var(--on-surface-variant)", fontFamily: "var(--font-body)" }}>
-                        USD / {PERIOD_LABEL[plan.billing_period] ?? plan.billing_period}
+                        {plan.currency} / {PERIOD_LABEL[plan.billing_period] ?? plan.billing_period}
                       </span>
                     </div>
                     <Button

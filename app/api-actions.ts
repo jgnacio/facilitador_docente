@@ -408,6 +408,7 @@ export type SubscriptionPlan = {
   description?: string;
   price_usd: number;
   billing_period: string;
+  currency: string;
   mp_plan_id?: string;
 };
 
