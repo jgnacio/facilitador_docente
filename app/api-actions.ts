@@ -630,6 +630,19 @@ export async function getAgentAccess(): Promise<AgentAccess> {
   }
 }
 
+export async function getPlanAccess(): Promise<{ has_max: boolean }> {
+  try {
+    const res = await fetch(`${API_URL}/access/plan`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
+    if (!res.ok) return { has_max: false };
+    return res.json();
+  } catch {
+    return { has_max: false };
+  }
+}
+
 // ── Instituciones — Licencias ─────────────────────────────────────────────────
 
 export type License = {

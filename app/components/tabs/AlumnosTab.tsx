@@ -11,7 +11,7 @@ import {
   getAlumnos, getGroups, createAlumno, updateAlumno, deleteAlumno,
   getInformesNEE, createInformeNEE, updateInformeNEE, deleteInformeNEE, uploadInformePDF,
   getDescripcionesFundadas, createDescripcionFundada, updateDescripcionFundada,
-  deleteDescripcionFundada, generarDescripcionPreview,
+  deleteDescripcionFundada, generarDescripcionPreview, getPlanAccess,
   type Alumno, type Group, type StudentReport, type DescripcionFundada, type EspacioDesempeno,
 } from "../../api-actions";
 import { useConfirmModal } from "@/app/components/ui/confirm-modal";
@@ -965,6 +965,13 @@ function DescripcionesFundasSection({ alumno }: { alumno: Alumno }) {
   const [view, setView] = useState<DescView>("list");
   const [editing, setEditing] = useState<DescripcionFundada | null>(null);
 
+  const { data: planAccess } = useQuery({
+    queryKey: ["plan-access"],
+    queryFn: getPlanAccess,
+    staleTime: 5 * 60 * 1000,
+  });
+  const hasMax = planAccess?.has_max ?? false;
+
   const { data: descripciones = [], isPending } = useQuery({
     queryKey: ["descripciones-fundadas", alumnoId],
     queryFn: () => getDescripcionesFundadas(alumnoId),
@@ -984,6 +991,28 @@ function DescripcionesFundasSection({ alumno }: { alumno: Alumno }) {
       onConfirm: () => deleteMutation.mutate(d.id),
     });
   };
+
+  if (!hasMax) {
+    return (
+      <div style={{ border: "1.5px solid var(--outline-variant)", borderRadius: "1rem", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "0.75rem", opacity: 0.85 }}>
+        <div className="flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
+            Descripciones Fundadas
+          </p>
+          <span style={{ marginLeft: "auto", padding: "0.2rem 0.6rem", borderRadius: "999px", background: "var(--primary)", color: "#fff", fontSize: "0.65rem", fontWeight: 700, fontFamily: "var(--font-dm-sans)", letterSpacing: "0.05em" }}>
+            MAX
+          </span>
+        </div>
+        <p style={{ fontSize: "0.8rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", lineHeight: 1.5 }}>
+          Generá descripciones fundadas con IA según el REDE (ANEP 2022) y la Circular 7/2020. Disponible en el plan <strong>Facilitador Docente MAX</strong>.
+        </p>
+        <a href="/subscriptions" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0.5rem 1rem", borderRadius: "0.75rem", background: "var(--primary)", color: "#fff", fontSize: "0.8rem", fontWeight: 700, fontFamily: "var(--font-dm-sans)", textDecoration: "none", width: "fit-content" }}>
+          Ver planes
+        </a>
+      </div>
+    );
+  }
 
   if (view === "create") {
     return (
