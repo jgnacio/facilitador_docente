@@ -882,14 +882,24 @@ function InformeNEEForm({
           Informe PDF <span style={{ fontWeight: 400, opacity: 0.6 }}>(opcional — solo para referencia)</span>
         </label>
         <input
+          id="pdf-upload"
           type="file"
           accept="application/pdf"
           onChange={(e) => setPdfFile(e.target.files?.[0] ?? null)}
-          style={{ fontSize: "0.8rem", color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}
+          style={{ display: "none" }}
         />
+        <label htmlFor="pdf-upload" style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", padding: "0.5rem 1rem", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "var(--surface)", color: "var(--on-surface)", fontSize: "0.8rem", fontWeight: 600, fontFamily: "var(--font-dm-sans)", cursor: "pointer", transition: "border-color 0.15s" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          {pdfFile ? pdfFile.name : informe?.informe_pdf_url ? "Reemplazar PDF" : "Adjuntar PDF"}
+        </label>
+        {pdfFile && (
+          <p style={{ fontSize: "0.68rem", color: "var(--primary)", marginTop: "0.35rem", fontFamily: "var(--font-dm-sans)" }}>
+            {pdfFile.name} — listo para subir
+          </p>
+        )}
         {informe?.informe_pdf_url && !pdfFile && (
-          <p style={{ fontSize: "0.68rem", color: "var(--on-surface-variant)", marginTop: "0.25rem", fontFamily: "var(--font-dm-sans)" }}>
-            PDF ya adjunto — subí uno nuevo para reemplazarlo.
+          <p style={{ fontSize: "0.68rem", color: "var(--on-surface-variant)", marginTop: "0.35rem", fontFamily: "var(--font-dm-sans)" }}>
+            PDF ya adjunto — presioná el botón para reemplazarlo.
           </p>
         )}
       </div>
