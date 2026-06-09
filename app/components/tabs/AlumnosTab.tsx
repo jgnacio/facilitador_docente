@@ -10,7 +10,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getAlumnos, getGroups, createAlumno, updateAlumno, deleteAlumno,
   getInformesNEE, createInformeNEE, updateInformeNEE, deleteInformeNEE, uploadInformePDF,
-  type Alumno, type Group, type StudentReport,
+  getDescripcionesFundadas, createDescripcionFundada, updateDescripcionFundada,
+  deleteDescripcionFundada, generarDescripcionPreview,
+  type Alumno, type Group, type StudentReport, type DescripcionFundada, type EspacioDesempeno,
 } from "../../api-actions";
 import { useConfirmModal } from "@/app/components/ui/confirm-modal";
 
@@ -395,6 +397,10 @@ function AlumnoForm({ alumno, groups, onBack, onSaved }: {
 
         {isEdit && alumno && (
           <InformesNEESection alumnoId={alumno.id} />
+        )}
+
+        {isEdit && alumno && (
+          <DescripcionesFundasSection alumno={alumno} />
         )}
 
         {error && (
@@ -903,6 +909,411 @@ function InformeNEEForm({
         </Button>
       </div>
     </div>
+  );
+}
+
+// ── Descripciones Fundadas ─────────────────────────────────────────────────────
+
+const ESPACIOS = [
+  { key: "espacio_comunicacion", label: "Espacio de Comunicación" },
+  { key: "espacio_cientifico_matematico", label: "Espacio Científico-Matemático" },
+  { key: "espacio_ciencias_sociales", label: "Espacio Ciencias Sociales y Humanidades" },
+  { key: "espacio_creativo_artistico", label: "Espacio Creativo-Artístico" },
+  { key: "espacio_desarrollo_personal", label: "Espacio de Desarrollo Personal y Conciencia Corporal" },
+  { key: "espacio_tecnico_tecnologico", label: "Espacio Técnico-Tecnológico" },
+];
+
+const NIVELES_REDE = [
+  { value: 1, label: "1 — Avance Mínimo", color: "#ef4444" },
+  { value: 2, label: "2 — Avance Escaso", color: "#f97316" },
+  { value: 3, label: "3 — Avance Moderado", color: "#eab308" },
+  { value: 4, label: "4 — Avance Significativo", color: "#22c55e" },
+  { value: 5, label: "5 — Avance Destacado", color: "#6366f1" },
+];
+
+const BIMESTRES = [
+  { value: 1, label: "1° Bimestre" },
+  { value: 2, label: "2° Bimestre" },
+  { value: 3, label: "3° Bimestre" },
+  { value: 4, label: "4° Bimestre" },
+];
+
+function nivelColor(nivel: number): string {
+  return NIVELES_REDE.find((n) => n.value === nivel)?.color ?? "var(--on-surface-variant)";
+}
+
+function nivelLabel(nivel: number): string {
+  return NIVELES_REDE.find((n) => n.value === nivel)?.label ?? `Nivel ${nivel}`;
+}
+
+type DescView = "list" | "create" | "edit";
+
+function DescripcionesFundasSection({ alumno }: { alumno: Alumno }) {
+  const alumnoId = alumno.id;
+  const queryClient = useQueryClient();
+  const { confirm, modal: confirmModal } = useConfirmModal();
+  const [view, setView] = useState<DescView>("list");
+  const [editing, setEditing] = useState<DescripcionFundada | null>(null);
+
+  const { data: descripciones = [], isPending } = useQuery({
+    queryKey: ["descripciones-fundadas", alumnoId],
+    queryFn: () => getDescripcionesFundadas(alumnoId),
+  });
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["descripciones-fundadas", alumnoId] });
+
+  const deleteMutation = useMutation({
+    mutationFn: (descId: number) => deleteDescripcionFundada(alumnoId, descId),
+    onSuccess: refresh,
+  });
+
+  const handleDelete = (d: DescripcionFundada) => {
+    confirm({
+      title: "Eliminar descripción fundada",
+      message: `¿Eliminar la descripción del ${d.bimestre}° bimestre ${d.anio}? Esta acción no se puede deshacer.`,
+      onConfirm: () => deleteMutation.mutate(d.id),
+    });
+  };
+
+  if (view === "create") {
+    return (
+      <DescripcionFundadaForm
+        alumno={alumno}
+        onBack={() => setView("list")}
+        onSaved={() => { setView("list"); refresh(); }}
+      />
+    );
+  }
+
+  if (view === "edit" && editing) {
+    return (
+      <DescripcionFundadaForm
+        alumno={alumno}
+        descripcion={editing}
+        onBack={() => { setView("list"); setEditing(null); }}
+        onSaved={() => { setView("list"); setEditing(null); refresh(); }}
+      />
+    );
+  }
+
+  return (
+    <>
+      {confirmModal}
+      <div style={{ border: "1.5px solid var(--outline-variant)", borderRadius: "1rem", padding: "1rem 1.25rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
+              Descripciones Fundadas
+            </p>
+            <p style={{ fontSize: "0.72rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", marginTop: "0.1rem" }}>
+              Evaluación bimestral · Art. 14 REDE (ANEP 2022)
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onPress={() => setView("create")}>
+            + Nueva descripción
+          </Button>
+        </div>
+
+        {isPending ? (
+          <div className="flex justify-center py-2">
+            <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ color: "var(--primary)" }}>
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+        ) : descripciones.length === 0 ? (
+          <p style={{ fontSize: "0.75rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", textAlign: "center", padding: "0.5rem 0" }}>
+            Sin descripciones fundadas registradas.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {descripciones.map((d) => {
+              const niveles = Object.values(d.espacios_desempeno).map((e) => e.nivel_avance);
+              const promedio = niveles.length ? Math.round(niveles.reduce((a, b) => a + b, 0) / niveles.length) : 0;
+              return (
+                <div key={d.id} style={{ background: "var(--surface-container-low)", borderRadius: "0.875rem", padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
+                      {d.bimestre}° Bimestre {d.anio}
+                    </p>
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {promedio > 0 && (
+                        <span style={{ fontSize: "0.68rem", fontWeight: 600, color: nivelColor(promedio), fontFamily: "var(--font-dm-sans)" }}>
+                          {nivelLabel(promedio)}
+                        </span>
+                      )}
+                      {d.descripcion_generada && (
+                        <span style={{ fontSize: "0.68rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", opacity: 0.7 }}>
+                          · Descripción generada
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => { setEditing(d); setView("edit"); }} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all" aria-label="Editar">
+                      <EditIcon />
+                    </button>
+                    <button onClick={() => handleDelete(d)} className="p-1.5 rounded-lg text-muted-foreground hover:text-danger hover:bg-danger/10 transition-all" aria-label="Eliminar">
+                      <TrashIcon />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function DescripcionFundadaForm({
+  alumno,
+  descripcion,
+  onBack,
+  onSaved,
+}: {
+  alumno: Alumno;
+  descripcion?: DescripcionFundada;
+  onBack: () => void;
+  onSaved: () => void;
+}) {
+  const alumnoId = alumno.id;
+  const isEdit = Boolean(descripcion);
+  const currentYear = new Date().getFullYear();
+
+  const defaultEspacios = (): Record<string, EspacioDesempeno> =>
+    Object.fromEntries(ESPACIOS.map((e) => [e.key, { nivel_avance: 3, observacion: "" }]));
+
+  const [bimestre, setBimestre] = useState(descripcion?.bimestre ?? 1);
+  const [anio, setAnio] = useState(descripcion?.anio ?? currentYear);
+  const [espacios, setEspacios] = useState<Record<string, EspacioDesempeno>>(
+    descripcion?.espacios_desempeno ?? defaultEspacios()
+  );
+  const [relacional, setRelacional] = useState(descripcion?.desempeno_relacional ?? "");
+  const [sugerencias, setSugerencias] = useState(descripcion?.sugerencias ?? "");
+  const [descripcionGenerada, setDescripcionGenerada] = useState(descripcion?.descripcion_generada ?? "");
+  const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState("");
+  const [conflict, setConflict] = useState(false);
+
+  const updateEspacio = (key: string, field: "nivel_avance" | "observacion", value: number | string) => {
+    setEspacios((prev) => ({ ...prev, [key]: { ...prev[key], [field]: value } }));
+  };
+
+  const save = async () => {
+    setError("");
+    setConflict(false);
+    setSaving(true);
+
+    const payload = { bimestre, anio, espacios_desempeno: espacios, desempeno_relacional: relacional, sugerencias };
+    let result: DescripcionFundada | null = null;
+
+    if (isEdit && descripcion) {
+      result = await updateDescripcionFundada(alumnoId, descripcion.id, {
+        ...payload,
+        descripcion_generada: descripcionGenerada || undefined,
+      });
+    } else {
+      result = await createDescripcionFundada(alumnoId, payload);
+      if (!result) {
+        setSaving(false);
+        setConflict(true);
+        setError(`Ya existe una descripción para el ${bimestre}° bimestre ${anio}. Editá la existente.`);
+        return;
+      }
+      if (descripcionGenerada && result) {
+        await updateDescripcionFundada(alumnoId, result.id, { descripcion_generada: descripcionGenerada });
+      }
+    }
+
+    setSaving(false);
+    if (result) onSaved();
+    else setError("Error al guardar. Verificá que la API esté activa.");
+  };
+
+  const generar = async () => {
+    const espaciosConObservacion = Object.values(espacios).filter((e) => e.observacion.trim()).length;
+    if (espaciosConObservacion < 2) {
+      setError("Completá la observación de al menos 2 espacios para poder generar la descripción.");
+      return;
+    }
+    setGenerating(true);
+    setError("");
+    const texto = await generarDescripcionPreview(alumnoId, {
+      alumno_nombre: alumno.nombre_completo,
+      alumno_nivel: alumno.nivel ?? "",
+      alumno_grado: alumno.grado ?? "",
+      bimestre,
+      anio,
+      espacios_desempeno: espacios,
+      desempeno_relacional: relacional,
+      sugerencias,
+    });
+    setGenerating(false);
+    if (texto) {
+      setDescripcionGenerada(texto);
+    } else {
+      setError("Error al generar la descripción. Intentá de nuevo.");
+    }
+  };
+
+  const labelStyle = { display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--on-surface-variant)", marginBottom: "0.4rem", fontFamily: "var(--font-dm-sans)" } as const;
+  const selectStyle = { width: "100%", padding: "0.625rem 1rem", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "var(--surface)", color: "var(--on-surface)", fontSize: "0.875rem", fontFamily: "var(--font-dm-sans)", outline: "none", cursor: "pointer", appearance: "auto" } as const;
+
+  return (
+    <div style={{ border: "1.5px solid var(--outline-variant)", borderRadius: "1rem", padding: "1rem 1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <div className="flex items-center gap-2">
+        <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--on-surface-variant)", display: "flex", alignItems: "center" }} aria-label="Volver">
+          <BackIcon />
+        </button>
+        <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
+          {isEdit ? "Editar descripción fundada" : "Nueva descripción fundada"}
+        </p>
+      </div>
+
+      {/* Bimestre + Año */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label style={labelStyle}>Bimestre</label>
+          <select value={bimestre} onChange={(e) => setBimestre(Number(e.target.value))} style={selectStyle}>
+            {BIMESTRES.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Año</label>
+          <input
+            type="number"
+            value={anio}
+            onChange={(e) => setAnio(Number(e.target.value))}
+            min={2020}
+            max={2040}
+            style={{ ...selectStyle, appearance: "auto" }}
+          />
+        </div>
+      </div>
+
+      {/* Espacios del conocimiento */}
+      <div>
+        <p style={{ ...labelStyle, fontSize: "0.85rem", color: "var(--on-surface)", marginBottom: "0.75rem" }}>
+          Desempeño por Espacio del conocimiento
+        </p>
+        <div className="flex flex-col gap-3">
+          {ESPACIOS.map((espacio) => {
+            const datos = espacios[espacio.key] ?? { nivel_avance: 3, observacion: "" };
+            return (
+              <div key={espacio.key} style={{ background: "var(--surface-container-low)", borderRadius: "0.875rem", padding: "0.875rem 1rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                <p style={{ fontWeight: 700, fontSize: "0.78rem", color: "var(--on-surface)", fontFamily: "var(--font-dm-sans)" }}>
+                  {espacio.label}
+                </p>
+                <div>
+                  <label style={{ ...labelStyle, fontSize: "0.72rem" }}>Nivel de avance (REDE)</label>
+                  <select
+                    value={datos.nivel_avance}
+                    onChange={(e) => updateEspacio(espacio.key, "nivel_avance", Number(e.target.value))}
+                    style={{ ...selectStyle, color: nivelColor(datos.nivel_avance), fontWeight: 600, fontSize: "0.8rem" }}
+                  >
+                    {NIVELES_REDE.map((n) => (
+                      <option key={n.value} value={n.value} style={{ color: n.color, fontWeight: 600 }}>
+                        {n.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ ...labelStyle, fontSize: "0.72rem" }}>Observación del docente</label>
+                  <textarea
+                    value={datos.observacion}
+                    onChange={(e) => updateEspacio(espacio.key, "observacion", e.target.value)}
+                    placeholder={`Ej: ${espacio.label === "Espacio de Comunicación" ? "El estudiante logra leer con apoyo docente pero no decodifica lo leído." : "Describí el desempeño del estudiante en este espacio…"}`}
+                    rows={2}
+                    style={{ width: "100%", padding: "0.5rem 0.875rem", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "var(--surface)", color: "var(--on-surface)", fontSize: "0.8rem", fontFamily: "var(--font-dm-sans)", outline: "none", resize: "vertical" }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Desempeño relacional */}
+      <div>
+        <label style={labelStyle}>Desempeño relacional</label>
+        <textarea
+          value={relacional}
+          onChange={(e) => setRelacional(e.target.value)}
+          placeholder="Describí cómo se relaciona el estudiante con sus pares y con los docentes…"
+          rows={3}
+          style={{ width: "100%", padding: "0.625rem 1rem", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "var(--surface)", color: "var(--on-surface)", fontSize: "0.875rem", fontFamily: "var(--font-dm-sans)", outline: "none", resize: "vertical" }}
+        />
+      </div>
+
+      {/* Sugerencias */}
+      <div>
+        <label style={labelStyle}>Sugerencias para mejorar</label>
+        <textarea
+          value={sugerencias}
+          onChange={(e) => setSugerencias(e.target.value)}
+          placeholder="¿En qué áreas puede seguir creciendo? ¿Qué apoyos necesita?"
+          rows={3}
+          style={{ width: "100%", padding: "0.625rem 1rem", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "var(--surface)", color: "var(--on-surface)", fontSize: "0.875rem", fontFamily: "var(--font-dm-sans)", outline: "none", resize: "vertical" }}
+        />
+      </div>
+
+      {/* Descripción generada */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <label style={labelStyle}>Descripción fundada</label>
+          <button
+            onClick={generar}
+            disabled={generating}
+            style={{ display: "flex", alignItems: "center", gap: "0.375rem", padding: "0.375rem 0.875rem", borderRadius: "0.75rem", border: "1.5px solid var(--primary)", background: generating ? "var(--primary-subtle)" : "var(--primary)", color: generating ? "var(--primary)" : "#fff", fontSize: "0.75rem", fontWeight: 700, fontFamily: "var(--font-dm-sans)", cursor: generating ? "not-allowed" : "pointer", transition: "all 0.15s", opacity: generating ? 0.7 : 1 }}
+          >
+            {generating ? (
+              <><svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Generando…</>
+            ) : (
+              <><SparklesIcon /> Generar con IA</>
+            )}
+          </button>
+        </div>
+        <textarea
+          value={descripcionGenerada}
+          onChange={(e) => setDescripcionGenerada(e.target.value)}
+          placeholder="Completá las observaciones y presioná 'Generar con IA', o escribí la descripción manualmente…"
+          rows={8}
+          style={{ width: "100%", padding: "0.625rem 1rem", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "var(--surface)", color: "var(--on-surface)", fontSize: "0.875rem", fontFamily: "var(--font-dm-sans)", outline: "none", resize: "vertical", lineHeight: 1.6 }}
+        />
+        <p style={{ fontSize: "0.68rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", marginTop: "0.25rem", opacity: 0.7 }}>
+          Podés editar el texto generado antes de guardar.
+        </p>
+      </div>
+
+      {error && (
+        <Chip color={conflict ? "warning" : "danger"} variant="soft" className="w-full justify-start px-3 py-2 text-sm rounded-xl h-auto">
+          {error}
+        </Chip>
+      )}
+
+      <div className="flex gap-3 pt-1">
+        <Button variant="tertiary" fullWidth onPress={onBack}>Cancelar</Button>
+        <Button variant="primary" fullWidth isPending={saving} onPress={save}>
+          {({ isPending }) => isPending
+            ? <><Spinner size="sm" color="current" /> Guardando…</>
+            : isEdit ? "Guardar cambios" : "Guardar descripción"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SparklesIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" />
+      <path d="M19 3l.75 2.25L22 6l-2.25.75L19 9l-.75-2.25L16 6l2.25-.75z" />
+      <path d="M5 18l.75 2.25L8 21l-2.25.75L5 24l-.75-2.25L2 21l2.25-.75z" />
+    </svg>
   );
 }
 

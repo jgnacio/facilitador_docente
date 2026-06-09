@@ -307,6 +307,140 @@ export async function uploadInformePDF(alumnoId: number, reportId: number, formD
   }
 }
 
+// ── Descripciones Fundadas ────────────────────────────────────────────────────
+
+export type EspacioDesempeno = {
+  nivel_avance: number;
+  observacion: string;
+};
+
+export type DescripcionFundada = {
+  id: number;
+  alumno_id: number;
+  user_id: string;
+  bimestre: number;
+  anio: number;
+  espacios_desempeno: Record<string, EspacioDesempeno>;
+  desempeno_relacional: string;
+  sugerencias: string;
+  descripcion_generada?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getDescripcionesFundadas(alumnoId: number): Promise<DescripcionFundada[]> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${alumnoId}/descripciones-fundadas`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function createDescripcionFundada(
+  alumnoId: number,
+  data: {
+    bimestre: number;
+    anio: number;
+    espacios_desempeno: Record<string, EspacioDesempeno>;
+    desempeno_relacional: string;
+    sugerencias: string;
+  }
+): Promise<DescripcionFundada | null> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${alumnoId}/descripciones-fundadas`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function updateDescripcionFundada(
+  alumnoId: number,
+  descId: number,
+  data: Partial<{
+    bimestre: number;
+    anio: number;
+    espacios_desempeno: Record<string, EspacioDesempeno>;
+    desempeno_relacional: string;
+    sugerencias: string;
+    descripcion_generada: string;
+  }>
+): Promise<DescripcionFundada | null> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${alumnoId}/descripciones-fundadas/${descId}`, {
+      method: "PUT",
+      headers: await authHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteDescripcionFundada(alumnoId: number, descId: number): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${alumnoId}/descripciones-fundadas/${descId}`, {
+      method: "DELETE",
+      headers: await authHeaders(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function generarDescripcionFundada(alumnoId: number, descId: number): Promise<DescripcionFundada | null> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${alumnoId}/descripciones-fundadas/${descId}/generar`, {
+      method: "POST",
+      headers: await authHeaders(),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function generarDescripcionPreview(
+  alumnoId: number,
+  data: {
+    alumno_nombre: string;
+    alumno_nivel?: string;
+    alumno_grado?: string;
+    bimestre: number;
+    anio: number;
+    espacios_desempeno: Record<string, EspacioDesempeno>;
+    desempeno_relacional: string;
+    sugerencias: string;
+  }
+): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/alumnos/${alumnoId}/descripciones-fundadas/generar-preview`, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.descripcion_generada ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Agente chat ───────────────────────────────────────────────────────────────
 
 export type ChatSession = {
