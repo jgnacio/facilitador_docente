@@ -1324,7 +1324,11 @@ function DescripcionFundadaForm({
           style={{ width: "100%", padding: "0.625rem 1rem", borderRadius: "0.75rem", border: "1.5px solid var(--outline-variant)", background: "var(--surface)", color: "var(--on-surface)", fontSize: "0.875rem", fontFamily: "var(--font-dm-sans)", outline: "none", resize: "vertical", lineHeight: 1.6 }}
         />
         <p style={{ fontSize: "0.68rem", color: "var(--on-surface-variant)", fontFamily: "var(--font-dm-sans)", marginTop: "0.25rem", opacity: 0.7 }}>
-          Podés editar el texto generado antes de guardar.
+          ✨ Generado con IA — editalo y dale tu toque personal antes de guardar.
+        </p>
+        <p style={{ fontSize: "0.68rem", fontFamily: "var(--font-dm-sans)", marginTop: "0.25rem", color: descripcionGenerada.length > 2000 ? "var(--danger)" : "var(--on-surface-variant)", opacity: descripcionGenerada.length > 2000 ? 1 : 0.7 }}>
+          {descripcionGenerada.length} / 2000 caracteres
+          {descripcionGenerada.length > 2000 && " — superaste el límite, acortá el texto"}
         </p>
       </div>
 
