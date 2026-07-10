@@ -38,7 +38,31 @@ const S = StyleSheet.create({
   cAct: { width: "29%" },
   cRol: { width: "18%" },
   cRec: { width: "16%" },
+  watermark: {
+    position: "absolute",
+    bottom: 0, left: 0, right: 0, top: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  watermarkText: {
+    fontSize: 28,
+    fontFamily: "Helvetica-Bold",
+    color: "#94a3b8",
+    opacity: 0.14,
+    transform: "rotate(-30deg)",
+    textAlign: "center",
+  },
 });
+
+function Watermark() {
+  return (
+    <View style={S.watermark}>
+      <Text style={S.watermarkText}>
+        Planificación generada con Facilitador Docente{"\n"}facilitadordocente.com
+      </Text>
+    </View>
+  );
+}
 
 function tagStyle(momento: string) {
   if (momento === "Inicio")     return { ...S.tag, ...S.tagInicio };
@@ -74,12 +98,21 @@ function MomentosTable({ momentos }: { momentos: NonNullable<ReturnType<typeof p
   );
 }
 
-export function ActivityPDF({ title, content }: { title: string; content?: string }) {
+export function ActivityPDF({
+  title,
+  content,
+  showWatermark = false,
+}: {
+  title: string;
+  content?: string;
+  showWatermark?: boolean;
+}) {
   const parsed = parseContent(content);
 
   return (
     <Document title={title}>
       <Page size="A4" orientation="landscape" style={S.page}>
+        {showWatermark && <Watermark />}
 
         {/* ── Planificación individual ───────────────────────── */}
         {parsed?.type === "planificacion" && (

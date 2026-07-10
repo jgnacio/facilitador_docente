@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser, UserButton } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Sparkles,
@@ -16,6 +17,8 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
+import { getUserTier } from "@/app/api-actions";
+import { TrialBanner } from "@/app/components/TrialBanner";
 
 export type Tab = "dashboard" | "alumnos" | "asistente" | "programa";
 
@@ -47,6 +50,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useUser();
+  const { data: tier } = useQuery({
+    queryKey: ["user-tier"],
+    queryFn: getUserTier,
+  });
 
   const activeTab = NAV.find(item => pathname.startsWith(item.href))?.id || "dashboard";
 
@@ -156,6 +163,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             : { minHeight: "100vh", overflowY: "auto" }),
         }}
       >
+        {activeTab !== "asistente" && !pathname.startsWith("/subscriptions") && tier?.is_trial && (
+          <TrialBanner tier={tier} />
+        )}
         {children}
       </main>
 

@@ -13,6 +13,7 @@ import { getChatSessions, deleteChatSession, getSessionMessages, getProject, get
 import { BookOpen, HeartHandshake, Layers, Lightbulb, Sparkles, Plus, Mic, Hammer, SendHorizontal, RotateCcw, ChevronDown, ChevronRight, FolderOpen, FileText, X, PanelLeftOpen, Users } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { useShowWatermark } from "../use-show-watermark";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
 const AGENT_BASE = API_BASE;
@@ -984,10 +985,11 @@ function MatchField({ label, value, onSurface, onVariant }: { label: string; val
 // ── PlanificacionTabla ────────────────────────────────────────────────────────
 
 function PlanificacionTabla({ data }: { data: PlanificacionData }) {
+  const showWatermark = useShowWatermark();
   const handleExportPDF = async () => {
     const { pdf } = await import("@react-pdf/renderer");
     const { PlanificacionPDF } = await import("../pdf/PlanificacionPDF");
-    const blob = await pdf(<PlanificacionPDF data={data} nombre={data.titulo} />).toBlob();
+    const blob = await pdf(<PlanificacionPDF data={data} nombre={data.titulo} showWatermark={showWatermark} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = `${data.titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`; a.click();
@@ -1084,11 +1086,12 @@ const secuenciaMomentoColor: Record<string, { bg: string; text: string }> = {
 };
 
 function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
+  const showWatermark = useShowWatermark();
   const handleExportPDF = async () => {
     const titulo = `${data.espacio} — ${data.unidad_curricular}`;
     const { pdf } = await import("@react-pdf/renderer");
     const { SecuenciaPDF } = await import("../pdf/SecuenciaPDF");
-    const blob = await pdf(<SecuenciaPDF data={data} nombre={titulo} />).toBlob();
+    const blob = await pdf(<SecuenciaPDF data={data} nombre={titulo} showWatermark={showWatermark} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = `${titulo.replace(/\s+/g, "_").slice(0, 60)}.pdf`; a.click();

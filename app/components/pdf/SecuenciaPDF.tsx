@@ -30,7 +30,31 @@ const styles = StyleSheet.create({
   colPlan:   { width: "42%" },
   colRecursos: { width: "18%" },
   planStep: { fontSize: 8, color: "#374151", lineHeight: 1.4, marginBottom: 2 },
+  watermark: {
+    position: "absolute",
+    bottom: 0, left: 0, right: 0, top: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  watermarkText: {
+    fontSize: 28,
+    fontFamily: "Helvetica-Bold",
+    color: "#94a3b8",
+    opacity: 0.14,
+    transform: "rotate(-30deg)",
+    textAlign: "center",
+  },
 });
+
+function Watermark() {
+  return (
+    <View style={styles.watermark}>
+      <Text style={styles.watermarkText}>
+        Planificación generada con Facilitador Docente{"\n"}facilitadordocente.com
+      </Text>
+    </View>
+  );
+}
 
 type PlanificacionMomento = {
   momento: string; duracion: string; meta_aprendizaje?: string;
@@ -58,10 +82,19 @@ type SecuenciaData = {
   actividades: SecuenciaActividad[];
 };
 
-export function SecuenciaPDF({ data, nombre }: { data: SecuenciaData; nombre: string }) {
+export function SecuenciaPDF({
+  data,
+  nombre,
+  showWatermark = false,
+}: {
+  data: SecuenciaData;
+  nombre: string;
+  showWatermark?: boolean;
+}) {
   return (
     <Document title={nombre}>
       <Page size="A4" orientation="landscape" style={styles.page}>
+        {showWatermark && <Watermark />}
         <Text style={styles.title}>{nombre}</Text>
 
         {/* Tabla de encabezado curricular */}

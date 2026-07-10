@@ -25,7 +25,31 @@ const S = StyleSheet.create({
   divider:     { height: 1, backgroundColor: "#e2e8f0", marginVertical: 8 },
   cMom: { width: "11%" }, cDur: { width: "8%" }, cMet: { width: "18%" },
   cAct: { width: "29%" }, cRol: { width: "18%" }, cRec: { width: "16%" },
+  watermark: {
+    position: "absolute",
+    bottom: 0, left: 0, right: 0, top: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  watermarkText: {
+    fontSize: 28,
+    fontFamily: "Helvetica-Bold",
+    color: "#94a3b8",
+    opacity: 0.14,
+    transform: "rotate(-30deg)",
+    textAlign: "center",
+  },
 });
+
+function Watermark() {
+  return (
+    <View style={S.watermark}>
+      <Text style={S.watermarkText}>
+        Planificación generada con Facilitador Docente{"\n"}facilitadordocente.com
+      </Text>
+    </View>
+  );
+}
 
 function tagStyle(m: string) {
   if (m === "Inicio")     return { ...S.tag, ...S.tagInicio };
@@ -37,12 +61,21 @@ function tagStyle(m: string) {
 type Seq = { name: string; learning_goal?: string; start_date?: string; end_date?: string };
 type Act = { title: string; raw_content?: string; order?: number };
 
-export function SequenceExportPDF({ sequence, activities }: { sequence: Seq; activities: Act[] }) {
+export function SequenceExportPDF({
+  sequence,
+  activities,
+  showWatermark = false,
+}: {
+  sequence: Seq;
+  activities: Act[];
+  showWatermark?: boolean;
+}) {
   const sorted = [...activities].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   return (
     <Document title={sequence.name}>
       <Page size="A4" orientation="landscape" style={S.page}>
+        {showWatermark && <Watermark />}
 
         {/* Header */}
         <View style={{ marginBottom: 12 }}>

@@ -20,6 +20,7 @@ import {
 import { ActivityCard } from "@/app/components/cards";
 import { AlumnosPanel } from "@/app/components/AlumnosPanel";
 import { useConfirmModal, RenameModal } from "@/app/components/ui/confirm-modal";
+import { useShowWatermark } from "@/app/components/use-show-watermark";
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return "";
@@ -40,6 +41,7 @@ export default function SequenceDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { confirm, modal: confirmModal } = useConfirmModal();
+  const showWatermark = useShowWatermark();
   const [selectedActId, setSelectedActId] = useState<string | null>(null);
   useEffect(() => {
     const clear = (e: MouseEvent) => {
@@ -123,7 +125,7 @@ export default function SequenceDetailPage() {
   const handleDownloadPdf = async (act: Activity) => {
     const { pdf } = await import("@react-pdf/renderer");
     const { ActivityPDF } = await import("@/app/components/pdf/ActivityPDF");
-    const blob = await pdf(<ActivityPDF title={act.title} content={act.raw_content} />).toBlob();
+    const blob = await pdf(<ActivityPDF title={act.title} content={act.raw_content} showWatermark={showWatermark} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

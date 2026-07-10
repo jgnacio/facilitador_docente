@@ -10,15 +10,66 @@ import {
   Spinner,
 } from "@heroui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, CheckCircle2, ExternalLink, XCircle } from "lucide-react";
+import { Sparkles, CheckCircle2, ExternalLink, XCircle, Check, X } from "lucide-react";
 import {
   getSubscriptionPlans,
   getActiveSubscription,
   createSubscriptionCheckout,
   cancelSubscription,
+  getUserTier,
   type SubscriptionPlan,
 } from "@/app/api-actions";
 import { useConfirmModal } from "@/app/components/ui/confirm-modal";
+import { TrialBanner } from "@/app/components/TrialBanner";
+
+const TIER_FEATURES: { label: string; free: string; basic: string; max: string }[] = [
+  { label: "Agente IA", free: "3 planificaciones/mes", basic: "Ilimitado", max: "Ilimitado" },
+  { label: "Grupos", free: "1 grupo", basic: "Ilimitados", max: "Ilimitados" },
+  { label: "Alumnos", free: "—", basic: "Sí", max: "Sí" },
+  { label: "Secuencias y proyectos", free: "—", basic: "Sí", max: "Sí" },
+  { label: "Informes NEE del especialista", free: "—", basic: "—", max: "Sí" },
+  { label: "Descripciones fundadas", free: "—", basic: "—", max: "Sí" },
+  { label: "PDF sin marca de agua", free: "—", basic: "—", max: "Sí" },
+];
+
+function FeatureCell({ value }: { value: string }) {
+  if (value === "—") {
+    return <X size={14} style={{ color: "var(--on-surface-variant)", opacity: 0.5 }} className="mx-auto" />;
+  }
+  if (value === "Sí") {
+    return <Check size={14} style={{ color: "var(--success)" }} className="mx-auto" />;
+  }
+  return <span className="text-xs">{value}</span>;
+}
+
+function TierComparisonTable() {
+  return (
+    <Card className="mb-6" style={{ boxShadow: "var(--shadow-ambient)", border: "1px solid var(--border)" }}>
+      <CardContent className="overflow-x-auto">
+        <table className="w-full text-sm" style={{ fontFamily: "var(--font-body)" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid var(--border)" }}>
+              <th className="text-left py-2 pr-2" style={{ color: "var(--on-surface-variant)" }}></th>
+              <th className="text-center py-2 px-2" style={{ fontFamily: "var(--font-display)", color: "var(--on-surface)" }}>Free</th>
+              <th className="text-center py-2 px-2" style={{ fontFamily: "var(--font-display)", color: "var(--on-surface)" }}>Básico</th>
+              <th className="text-center py-2 px-2" style={{ fontFamily: "var(--font-display)", color: "var(--primary)" }}>MAX</th>
+            </tr>
+          </thead>
+          <tbody>
+            {TIER_FEATURES.map((row) => (
+              <tr key={row.label} style={{ borderBottom: "1px solid var(--border)" }}>
+                <td className="py-2 pr-2 text-xs" style={{ color: "var(--on-surface)" }}>{row.label}</td>
+                <td className="py-2 px-2 text-center"><FeatureCell value={row.free} /></td>
+                <td className="py-2 px-2 text-center"><FeatureCell value={row.basic} /></td>
+                <td className="py-2 px-2 text-center"><FeatureCell value={row.max} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  );
+}
 
 const PERIOD_LABEL: Record<string, string> = {
   monthly:   "Mensual",
@@ -49,6 +100,11 @@ export default function SubscriptionsPage() {
   const { data: subscription, isPending: loadingSub } = useQuery({
     queryKey: ["active-subscription"],
     queryFn: getActiveSubscription,
+  });
+
+  const { data: tier } = useQuery({
+    queryKey: ["user-tier"],
+    queryFn: getUserTier,
   });
 
   const handleCancel = () => {
@@ -113,6 +169,14 @@ export default function SubscriptionsPage() {
           </p>
         </div>
       </div>
+
+      {tier && (
+        <div className="mb-6 -mx-6 sm:mx-0 sm:rounded-xl overflow-hidden">
+          <TrialBanner tier={tier} showCta={false} />
+        </div>
+      )}
+
+      <TierComparisonTable />
 
       {loadingSub ? (
         <div className="flex justify-center py-4">

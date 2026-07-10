@@ -20,6 +20,7 @@ import {
 import { SequenceCard, ActivityCard } from "@/app/components/cards";
 import { useConfirmModal, RenameModal } from "@/app/components/ui/confirm-modal";
 import { AlumnosPanel } from "@/app/components/AlumnosPanel";
+import { useShowWatermark } from "@/app/components/use-show-watermark";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { confirm, modal: confirmModal } = useConfirmModal();
+  const showWatermark = useShowWatermark();
   const [selectedActId, setSelectedActId] = useState<string | null>(null);
   useEffect(() => {
     const clear = (e: MouseEvent) => {
@@ -163,7 +165,7 @@ export default function ProjectDetailPage() {
     const acts = await getActivities(groupId, projectId, seq.id);
     const { pdf } = await import("@react-pdf/renderer");
     const { SequenceExportPDF } = await import("@/app/components/pdf/SequenceExportPDF");
-    const blob = await pdf(<SequenceExportPDF sequence={seq} activities={acts} />).toBlob();
+    const blob = await pdf(<SequenceExportPDF sequence={seq} activities={acts} showWatermark={showWatermark} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -202,7 +204,7 @@ export default function ProjectDetailPage() {
   const handleDownloadPdf = async (act: { title: string; raw_content?: string }) => {
     const { pdf } = await import("@react-pdf/renderer");
     const { ActivityPDF } = await import("@/app/components/pdf/ActivityPDF");
-    const blob = await pdf(<ActivityPDF title={act.title} content={act.raw_content} />).toBlob();
+    const blob = await pdf(<ActivityPDF title={act.title} content={act.raw_content} showWatermark={showWatermark} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

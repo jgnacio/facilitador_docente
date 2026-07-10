@@ -12,6 +12,7 @@ import {
   type Planificacion,
 } from "../../api-actions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useShowWatermark } from "../use-show-watermark";
 
 type View = "list" | "detail" | "edit";
 
@@ -286,10 +287,11 @@ function DetailView({ plan, onBack, onEdit, onDelete }: {
 // ── PlanTabla ─────────────────────────────────────────────────────────────────
 
 function PlanTabla({ data, nombre }: { data: PlanEstructurada; nombre: string }) {
+  const showWatermark = useShowWatermark();
   const handleExportPDF = async () => {
     const { pdf } = await import("@react-pdf/renderer");
     const { PlanificacionPDF } = await import("../pdf/PlanificacionPDF");
-    const blob = await pdf(<PlanificacionPDF data={data} nombre={nombre} />).toBlob();
+    const blob = await pdf(<PlanificacionPDF data={data} nombre={nombre} showWatermark={showWatermark} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -410,10 +412,11 @@ function PlanTabla({ data, nombre }: { data: PlanEstructurada; nombre: string })
 // ── SecuenciaTabla ────────────────────────────────────────────────────────────
 
 function SecuenciaTabla({ data, nombre }: { data: SecuenciaEstructurada; nombre: string }) {
+  const showWatermark = useShowWatermark();
   const handleExportPDF = async () => {
     const { pdf } = await import("@react-pdf/renderer");
     const { SecuenciaPDF } = await import("../pdf/SecuenciaPDF");
-    const blob = await pdf(<SecuenciaPDF data={data} nombre={nombre} />).toBlob();
+    const blob = await pdf(<SecuenciaPDF data={data} nombre={nombre} showWatermark={showWatermark} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

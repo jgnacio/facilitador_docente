@@ -643,6 +643,26 @@ export async function getPlanAccess(): Promise<{ has_max: boolean }> {
   }
 }
 
+export type UserTier = {
+  tier: "free" | "basic" | "max";
+  is_trial: boolean;
+  trial_ends_at?: string | null;
+  free_plans_remaining?: number | null;
+};
+
+export async function getUserTier(): Promise<UserTier> {
+  try {
+    const res = await fetch(`${API_URL}/access/tier`, {
+      cache: "no-store",
+      headers: await authHeaders(),
+    });
+    if (!res.ok) return { tier: "free", is_trial: false };
+    return res.json();
+  } catch {
+    return { tier: "free", is_trial: false };
+  }
+}
+
 // ── Instituciones — Licencias ─────────────────────────────────────────────────
 
 export type License = {

@@ -31,7 +31,34 @@ const styles = StyleSheet.create({
   footerText:  { color: "#555" },
   footerMeta:  { color: "#999", marginTop: 2 },
   row: { flexDirection: "row", marginBottom: 2 },
+  watermark: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  watermarkText: {
+    fontSize: 28,
+    fontFamily: "Helvetica-Bold",
+    color: "#94a3b8",
+    opacity: 0.14,
+    transform: "rotate(-30deg)",
+    textAlign: "center",
+  },
 });
+
+function Watermark() {
+  return (
+    <View style={styles.watermark}>
+      <Text style={styles.watermarkText}>
+        Planificación generada con Facilitador Docente{"\n"}facilitadordocente.com
+      </Text>
+    </View>
+  );
+}
 
 type PlanMomento = {
   momento: string;
@@ -66,10 +93,19 @@ const tagStyle = (momento: string) => {
   return styles.tag;
 };
 
-export function PlanificacionPDF({ data, nombre }: { data: PlanificacionData; nombre: string }) {
+export function PlanificacionPDF({
+  data,
+  nombre,
+  showWatermark = false,
+}: {
+  data: PlanificacionData;
+  nombre: string;
+  showWatermark?: boolean;
+}) {
   return (
     <Document title={nombre}>
       <Page size="A4" orientation="landscape" style={styles.page}>
+        {showWatermark && <Watermark />}
         {/* Encabezado */}
         <View style={styles.section}>
           <Text style={styles.title}>{data.titulo || nombre}</Text>
