@@ -1100,6 +1100,9 @@ const secuenciaMomentoColor: Record<string, { bg: string; text: string }> = {
 
 function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
   const showWatermark = useShowWatermark();
+  const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+  const toggleCollapsed = (i: number) =>
+    setCollapsed((prev) => ({ ...prev, [i]: !prev[i] }));
   const handleExportPDF = async () => {
     const titulo = `${data.espacio} — ${data.unidad_curricular}`;
     const { pdf } = await import("@react-pdf/renderer");
@@ -1173,10 +1176,16 @@ function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
       <div className="space-y-4">
         {data.actividades.map((act, i) => {
           const isNewFormat = Array.isArray(act.momentos) && act.momentos.length > 0;
+          const isCollapsed = !!collapsed[i];
           return (
             <div key={i} className="rounded-xl border border-border overflow-hidden text-xs">
               {/* Activity header */}
-              <div className="flex items-start gap-3 px-3 py-2.5 border-b border-border" style={{ background: "var(--surface-container-low)" }}>
+              <button
+                type="button"
+                onClick={() => toggleCollapsed(i)}
+                className="w-full flex items-start gap-3 px-3 py-2.5 border-b border-border text-left transition-colors"
+                style={{ background: "var(--surface-container-low)" }}
+              >
                 <span className="font-bold text-foreground shrink-0" style={{ fontFamily: "var(--font-display)" }}>
                   {isNewFormat ? `${i + 1}.` : `${act.numero ?? i + 1}.`}
                 </span>
@@ -1196,10 +1205,11 @@ function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
                     <p className="text-foreground/70 mt-0.5 leading-relaxed" style={{ fontFamily: "var(--font-body)" }}>{act.meta_aprendizaje}</p>
                   )}
                 </div>
-              </div>
+                <ChevronRight className={`w-4 h-4 shrink-0 mt-0.5 text-muted-foreground transition-transform ${!isCollapsed ? "rotate-90" : ""}`} />
+              </button>
 
               {/* Nuevo formato: tabla de momentos */}
-              {isNewFormat && (
+              {isNewFormat && !isCollapsed && (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border-collapse min-w-[480px]">
                     <thead>
@@ -1233,7 +1243,7 @@ function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
               )}
 
               {/* Formato legacy: bullets de plan_aprendizaje */}
-              {!isNewFormat && Array.isArray(act.plan_aprendizaje) && act.plan_aprendizaje.length > 0 && (
+              {!isNewFormat && !isCollapsed && Array.isArray(act.plan_aprendizaje) && act.plan_aprendizaje.length > 0 && (
                 <ul className="px-3 py-2.5 space-y-1">
                   {act.plan_aprendizaje.map((paso, j) => (
                     <li key={j} className="flex gap-2 text-foreground/80" style={{ fontFamily: "var(--font-body)" }}>
