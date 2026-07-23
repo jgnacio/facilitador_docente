@@ -257,6 +257,11 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
       agentMessage = `${contextMessage} ${t}`;
     }
 
+    const controller = new AbortController();
+    // 240s: la generación final del LLM sola puede tardar ~60s, y sumada a varias tool calls
+    // un turno legítimo supera fácil el minuto; Cloud Run corta a los 300s, dejamos margen debajo de eso
+    const timeoutId = setTimeout(() => controller.abort(), 240_000);
+
     try {
       const token = await getToken();
       const res = await fetch(`${AGENT_BASE}/agente/chat/stream`, {
@@ -266,6 +271,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ message: agentMessage, session_id: currentSessionId }),
+        signal: controller.signal,
       });
 
 
@@ -289,6 +295,7 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
           } else if (evt.type === "token") {
             setStreamingText((prev) => prev + evt.text);
           } else if (evt.type === "done") {
+            clearTimeout(timeoutId);
             setStreamingText("");
             if (evt.session_id && evt.session_id !== currentSessionId) {
               setCurrentSessionId(evt.session_id);
@@ -306,9 +313,15 @@ export default function AsistenteTab({ contextMessage, contextLabel }: { context
           }
         }
       }
-    } catch {
-      setMessages((prev) => [...prev, { id: generateId(), role: "error", text: "Error de conexión.", refs: [] }]);
+    } catch (err) {
+      const isTimeout = err instanceof DOMException && err.name === "AbortError";
+      const text = isTimeout
+        ? "El agente está tardando más de lo esperado. Intentá de nuevo en unos segundos."
+        : "Error de conexión.";
+      setMessages((prev) => [...prev, { id: generateId(), role: "error", text, refs: [] }]);
       setLoading(false);
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 

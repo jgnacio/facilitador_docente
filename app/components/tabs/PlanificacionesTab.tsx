@@ -12,6 +12,7 @@ import {
   type Planificacion,
 } from "../../api-actions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronRight } from "lucide-react";
 import { useShowWatermark } from "../use-show-watermark";
 
 type View = "list" | "detail" | "edit";
@@ -413,6 +414,9 @@ function PlanTabla({ data, nombre }: { data: PlanEstructurada; nombre: string })
 
 function SecuenciaTabla({ data, nombre }: { data: SecuenciaEstructurada; nombre: string }) {
   const showWatermark = useShowWatermark();
+  const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+  const toggleCollapsed = (i: number) =>
+    setCollapsed((prev) => ({ ...prev, [i]: !prev[i] }));
   const handleExportPDF = async () => {
     const { pdf } = await import("@react-pdf/renderer");
     const { SecuenciaPDF } = await import("../pdf/SecuenciaPDF");
@@ -550,9 +554,14 @@ function SecuenciaTabla({ data, nombre }: { data: SecuenciaEstructurada; nombre:
             Desarrollo: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
             Cierre:     "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300",
           };
+          const isCollapsed = !!collapsed[i];
           return (
             <div key={i} className="rounded-xl border border-border overflow-hidden text-xs">
-              <div className="flex items-start gap-3 px-3 py-2.5 border-b border-border bg-muted/30">
+              <button
+                type="button"
+                onClick={() => toggleCollapsed(i)}
+                className="w-full flex items-start gap-3 px-3 py-2.5 border-b border-border bg-muted/30 text-left hover:bg-muted/50 transition-colors"
+              >
                 <span className="font-bold text-foreground shrink-0">
                   {isNewFormat ? `${i + 1}.` : `${act.numero ?? i + 1}.`}
                 </span>
@@ -569,9 +578,10 @@ function SecuenciaTabla({ data, nombre }: { data: SecuenciaEstructurada; nombre:
                     <p className="text-foreground/70 mt-0.5 leading-relaxed">{act.meta_aprendizaje}</p>
                   )}
                 </div>
-              </div>
+                <ChevronRight className={`w-4 h-4 shrink-0 mt-0.5 text-muted-foreground transition-transform ${!isCollapsed ? "rotate-90" : ""}`} />
+              </button>
 
-              {isNewFormat && (
+              {isNewFormat && !isCollapsed && (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border-collapse min-w-[480px]">
                     <thead>
@@ -601,7 +611,7 @@ function SecuenciaTabla({ data, nombre }: { data: SecuenciaEstructurada; nombre:
                 </div>
               )}
 
-              {!isNewFormat && Array.isArray(act.plan_aprendizaje) && act.plan_aprendizaje.length > 0 && (
+              {!isNewFormat && !isCollapsed && Array.isArray(act.plan_aprendizaje) && act.plan_aprendizaje.length > 0 && (
                 <ul className="px-3 py-2.5 space-y-1">
                   {act.plan_aprendizaje.map((paso, j) => (
                     <li key={j} className="flex gap-2 text-foreground/80">
@@ -786,9 +796,9 @@ function EditIcon() {
     </svg>
   );
 }
-function ChevronRightIcon() {
+function ChevronRightIcon({ className = "w-4 h-4 text-muted-foreground flex-shrink-0" }: { className?: string }) {
   return (
-    <svg className="w-4 h-4 text-muted-foreground flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
     </svg>
   );
