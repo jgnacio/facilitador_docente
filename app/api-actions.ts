@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { normalizeRefs, type PdfRef } from "./lib/pdf-refs";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8001";
 
@@ -491,8 +492,23 @@ export async function getSessionMessages(apSessionId: string): Promise<SessionMe
   }
 }
 
-export type PdfRef = { filename: string; page: number; label: string };
+export type { PdfRef } from "./lib/pdf-refs";
 export type AgentResponse = { text: string; refs: PdfRef[]; session_id: string };
+
+/** Signed URL de lectura del PDF oficial. El bucket es privado y la URL expira. */
+export async function getCurriculoPdfUrl(docId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/curriculo/pdfs/${encodeURIComponent(docId)}/signed-url`, {
+      headers: await authHeaders(),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data?.url === "string" ? data.url : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function createAdkSession(_sessionId: string): Promise<void> {
   // En prod el agente crea la sesión automáticamente en el primer mensaje
@@ -1327,15 +1343,12 @@ function parseAgentResponse(data: unknown): AgentResponse {
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.text === "string") {
-      const refs: PdfRef[] = Array.isArray(parsed.refs)
-        ? (parsed.refs as unknown[]).filter(
-            (r): r is PdfRef =>
-              typeof r === "object" &&
-              r !== null &&
-              typeof (r as PdfRef).filename === "string" &&
-              typeof (r as PdfRef).page === "number"
-          )
-        : [];
+      // Las citas pueden venir a nivel de mensaje o dentro de la planificación/secuencia.
+      const refs = normalizeRefs([
+        ...(Array.isArray(parsed.refs) ? parsed.refs : []),
+        ...(Array.isArray(parsed.planificacion?.refs) ? parsed.planificacion.refs : []),
+        ...(Array.isArray(parsed.secuencia?.refs) ? parsed.secuencia.refs : []),
+      ]);
       return { text: parsed.text, refs, session_id };
     }
   } catch { /* no es JSON — respuesta plana */ }

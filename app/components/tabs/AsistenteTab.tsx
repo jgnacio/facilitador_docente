@@ -9,7 +9,9 @@ import { useAuth, useUser } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Card } from "@heroui/react";
-import { getChatSessions, deleteChatSession, getSessionMessages, getProject, getGroup, getSequences, getActivities, getAlumnosByGroup, type ChatSession, type PdfRef } from "../../api-actions";
+import { getChatSessions, deleteChatSession, getSessionMessages, getProject, getGroup, getSequences, getActivities, getAlumnosByGroup, type ChatSession } from "../../api-actions";
+import { normalizeRefs, type PdfRef } from "../../lib/pdf-refs";
+import { CitationBadges } from "../pdf/CitationBadges";
 import { BookOpen, HeartHandshake, Layers, Lightbulb, Sparkles, Plus, Mic, Hammer, SendHorizontal, RotateCcw, ChevronDown, ChevronRight, FolderOpen, FileText, X, PanelLeftOpen, Users } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -39,6 +41,7 @@ type SecuenciaActividad = {
   ce_codigo?: string; ce_texto?: string; contenido?: string;
   criterio_de_logro?: string; espacio?: string; unidad?: string;
   tramo?: number; competencias_mcn?: string[];
+  refs?: PdfRef[];
   // Formato legacy
   numero?: number; recorte?: string; meta_aprendizaje?: string;
   plan_aprendizaje?: string[]; recursos?: string;
@@ -48,6 +51,7 @@ type SecuenciaData = {
   competencias_generales: string[]; competencias_especificas: string[];
   criterios_de_logro: string[]; meta_aprendizaje: string;
   contenido: string; evaluaciones?: string; actividades: SecuenciaActividad[];
+  refs?: PdfRef[];
 };
 type PlanificacionData = {
   titulo: string; grupo: string; justificacion: string;
@@ -55,6 +59,7 @@ type PlanificacionData = {
   momentos: PlanificacionMomento[]; ce_codigo: string; ce_texto: string;
   contenido: string; criterio_de_logro: string; espacio: string;
   unidad: string; tramo: number; competencias_mcn: string[];
+  refs?: PdfRef[];
 };
 type Message = {
   id: string; role: Role; text: string; refs: PdfRef[];
@@ -101,14 +106,7 @@ function parseAgentResponse(data: unknown): {
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.text === "string") {
-      const refs: PdfRef[] = Array.isArray(parsed.refs)
-        ? (parsed.refs as unknown[]).filter(
-            (r): r is PdfRef =>
-              typeof r === "object" && r !== null &&
-              typeof (r as PdfRef).filename === "string" &&
-              typeof (r as PdfRef).page === "number"
-          )
-        : [];
+      const refs = normalizeRefs(parsed.refs);
       return {
         text: parsed.text, refs,
         curriculum_match: parsed.curriculum_match ?? undefined,
@@ -885,32 +883,8 @@ const Bubble = memo(({
           />
         )}
 
-        {/* PDF refs */}
-        {message.refs.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-1">
-            {message.refs.map((ref, i) => (
-              <a
-                key={i}
-                href={`${API_BASE}/pdfs/${encodeURIComponent(ref.filename)}#page=${ref.page}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-xl transition-opacity hover:opacity-80"
-                style={{
-                  padding: "0.25rem 0.75rem",
-                  background: "var(--tertiary-subtle)",
-                  color: "var(--tertiary)",
-                  fontSize: "0.72rem",
-                  fontWeight: 600,
-                  fontFamily: "var(--font-body)",
-                  textDecoration: "none",
-                }}
-              >
-                <PdfIcon />
-                {ref.label || `${ref.filename} p.${ref.page}`}
-              </a>
-            ))}
-          </div>
-        )}
+        {/* Citas al currículo oficial — abren el PDF en la página exacta */}
+        <CitationBadges refs={message.refs} />
       </div>
     </div>
   );
@@ -1085,6 +1059,7 @@ function PlanificacionTabla({ data }: { data: PlanificacionData }) {
         <p style={{ fontFamily: "var(--font-body)" }}><strong className="text-foreground" style={{ fontFamily: "var(--font-display)" }}>Contenido:</strong> {data.contenido}</p>
         <p style={{ fontFamily: "var(--font-body)" }}><strong className="text-foreground" style={{ fontFamily: "var(--font-display)" }}>Criterio de logro:</strong> {data.criterio_de_logro}</p>
         <p className="text-foreground/50" style={{ fontFamily: "var(--font-body)" }}>{data.espacio} · {data.unidad} · Tramo {data.tramo}</p>
+        <CitationBadges refs={normalizeRefs(data.refs)} />
       </div>
     </Card>
   );
@@ -1258,11 +1233,17 @@ function SecuenciaTablaInline({ data }: { data: SecuenciaData }) {
                 <div className="px-3 py-2 space-y-0.5 border-t border-border" style={{ background: "var(--surface-container-lowest)" }}>
                   {act.ce_codigo && <p style={{ fontFamily: "var(--font-body)", fontSize: "0.7rem" }}><strong style={{ fontFamily: "var(--font-display)" }}>{act.ce_codigo}</strong>{act.ce_texto ? ` — ${act.ce_texto}` : ""}</p>}
                   {act.criterio_de_logro && <p className="text-muted-foreground" style={{ fontFamily: "var(--font-body)", fontSize: "0.7rem" }}><strong className="text-foreground" style={{ fontFamily: "var(--font-display)" }}>Criterio:</strong> {act.criterio_de_logro}</p>}
+                  <CitationBadges refs={normalizeRefs(act.refs)} />
                 </div>
               )}
             </div>
           );
         })}
+      </div>
+
+      {/* Citas que respaldan la secuencia completa */}
+      <div className="px-1">
+        <CitationBadges refs={normalizeRefs(data.refs)} />
       </div>
     </Card>
   );

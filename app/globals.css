@@ -148,3 +148,12 @@ h1, h2, h3, h4, h5, h6 {
 * {
   box-sizing: border-box;
 }
+
+/* Visor de citas del currículo oficial (PdfCitationViewer).
+   La capa de texto de pdf.js se superpone al canvas con texto transparente: el
+   resaltado tiene que pintar el fondo sin volver visible ese texto duplicado. */
+.react-pdf__Page__textContent mark.pdf-cita-resaltada {
+  background: var(--tertiary-subtle, rgba(255, 214, 0, 0.45));
+  color: inherit;
+  border-radius: 2px;
+}
