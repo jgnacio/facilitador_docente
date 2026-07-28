@@ -21,13 +21,18 @@ const MIN_SCALE = 0.5;
 const MAX_SCALE = 2.5;
 const SCALE_STEP = 0.25;
 
-/** Normaliza para comparar: sin acentos, sin mayúsculas, con espacios colapsados. */
+/** Normaliza para comparar: sin acentos, sin mayúsculas y sin espacios.
+ *
+ * Se quitan todos los espacios, no sólo los repetidos, porque el pasaje citado
+ * puede venir con un espaciado distinto al del PDF —el programa pega la
+ * numeración al enunciado ("3.1.Las") y el currículo la separa para que se lea—
+ * y esa sola diferencia alcanzaría para que el pasaje no se resalte. */
 function normalize(text: string): string {
   return text
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
+    .replace(/\s+/g, "")
     .trim();
 }
 
@@ -81,12 +86,19 @@ export function PdfCitationViewer({
   const target = useMemo(() => normalize(cita.excerpt ?? ""), [cita.excerpt]);
 
   // react-pdf inyecta el retorno como HTML en la capa de texto: cada fragmento que
-  // forme parte del pasaje citado se envuelve en <mark>. Los fragmentos muy cortos
-  // se saltean porque coincidirían con cualquier cosa ("de", "la").
+  // forme parte del pasaje citado se envuelve en <mark>.
+  //
+  // El mínimo de largo es alto a propósito. Una palabra suelta del pasaje ("pro-
+  // ducción") también aparece en otras filas de la misma tabla, y marcarlas
+  // ensucia la página con resaltados que no son la cita. Un renglón real del PDF
+  // ronda los 30 caracteres, así que el corte deja pasar los fragmentos legítimos
+  // y descarta las coincidencias sueltas. Ante la duda, no resaltar.
+  const MIN_FRAGMENTO = 14;
   const customTextRenderer = useCallback(
     ({ str }: { str: string }) => {
       const fragment = normalize(str);
-      const isCited = target.length > 0 && fragment.length > 3 && target.includes(fragment);
+      const isCited =
+        target.length > 0 && fragment.length >= MIN_FRAGMENTO && target.includes(fragment);
       return isCited
         ? `<mark class="pdf-cita-resaltada">${escapeHtml(str)}</mark>`
         : escapeHtml(str);

@@ -2,16 +2,45 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Chip, Spinner } from "@heroui/react";
+import dynamic from "next/dynamic";
 import { getCurriculumEstructura } from "../../api-actions";
+import type { PdfRef } from "../../lib/pdf-refs";
+
+// pdf.js sólo corre en el browser (usa DOMMatrix y demás APIs del DOM) y pesa
+// bastante: el visor se carga recién cuando la docente abre una cita.
+const PdfCitationViewer = dynamic(
+  () => import("../pdf/PdfCitationViewer").then((m) => m.PdfCitationViewer),
+  { ssr: false }
+);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type CE = { codigo: string; texto: string; mcn: string[] };
+type CE = { codigo: string; texto: string; mcn: string[]; verificado?: boolean };
+/** Contenido o criterio, con la CE que lo cubre y la página del PDF de donde sale. */
+type ItemCurricular = {
+  id: string;
+  texto: string;
+  ces: string[];
+  pagina: number;
+  doc_id?: string;
+  ciclo?: string;
+};
+/** Aclaración del programa sobre cómo leer la tabla. No es contenido curricular,
+ *  pero condiciona cómo se aplican los criterios (p. ej. que valgan para todo el
+ *  tramo aunque estén listados por nivel). */
+type NotaPrograma = {
+  texto: string;
+  aplica_a: string;
+  pagina: number;
+  doc_id?: string;
+  ciclo?: string;
+};
 type Materia = {
   nombre: string;
+  notas?: NotaPrograma[];
   competencias_especificas: CE[];
-  contenidos: Record<string, string[]>;
-  criterios: Record<string, string[]>;
+  contenidos: Record<string, ItemCurricular[]>;
+  criterios: Record<string, ItemCurricular[]>;
 };
 type FlatEntry = {
   tramoKey: string;
@@ -57,6 +86,11 @@ function buildIndex(tramos: Record<string, any>): FlatEntry[] {
 }
 
 function entryId(e: FlatEntry) { return `${e.tramoKey}/${e.materiaKey}`; }
+
+/** Texto del ítem, venga en el formato nuevo (objeto) o en el viejo (string). */
+function textoDe(item: ItemCurricular | string): string {
+  return typeof item === "string" ? item : item?.texto ?? "";
+}
 
 function snip(text: string, q: string): string {
   const i = text.toLowerCase().indexOf(q.toLowerCase());
@@ -136,13 +170,115 @@ function CEAccordion({ ces }: { ces: CE[] }) {
   );
 }
 
-function StringList({ items, emptyMsg }: { items: string[]; emptyMsg: string }) {
+function NotasPrograma({
+  notas,
+  onAbrirCita,
+}: {
+  notas: NotaPrograma[];
+  onAbrirCita: (cita: PdfRef) => void;
+}) {
+  if (!notas.length) return null;
+  return (
+    <div className="space-y-2 mb-3">
+      {notas.map((nota) => (
+        <div
+          key={`${nota.pagina}-${nota.aplica_a}`}
+          className="rounded-lg border px-4 py-3"
+          style={{ borderColor: "var(--accent)", background: "rgba(244,125,49,0.06)" }}
+        >
+          <p className="text-xs font-semibold mb-1" style={{ color: "var(--accent)" }}>
+            Nota del programa oficial
+          </p>
+          <p className="text-sm text-foreground leading-relaxed">{nota.texto}</p>
+          {nota.doc_id ? (
+            <button
+              type="button"
+              className="text-xs mt-2 underline"
+              style={{ color: "var(--accent)" }}
+              onClick={() =>
+                onAbrirCita({
+                  doc_id: nota.doc_id as string,
+                  page: nota.pagina,
+                  ciclo: nota.ciclo ?? "",
+                  label: `${nota.ciclo || "Currículo oficial"} — p.${nota.pagina}`,
+                  excerpt: nota.texto,
+                })
+              }
+            >
+              Ver en el programa · p. {nota.pagina}
+            </button>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ItemList({
+  items,
+  emptyMsg,
+  onAbrirCita,
+}: {
+  items: (ItemCurricular | string)[];
+  emptyMsg: string;
+  onAbrirCita: (cita: PdfRef) => void;
+}) {
   if (!items?.length) return <p className="text-sm text-muted-foreground py-4">{emptyMsg}</p>;
   return (
     <ul className="space-y-2">
-      {items.map((item, i) => (
-        <li key={i} className="border border-border rounded-lg px-4 py-3 text-sm text-foreground leading-relaxed">{item}</li>
-      ))}
+      {items.map((raw, i) => {
+        // El backend cachea el currículo en memoria, así que hasta que se lo
+        // reinicie puede seguir sirviendo el formato viejo, donde cada ítem era
+        // sólo el texto. Se aceptan los dos para no romper la vista.
+        const item = typeof raw === "string" ? { id: `${i}`, texto: raw, ces: [], pagina: 0 } : raw;
+        // Sin doc_id y página no hay a dónde ir: queda como texto, no como botón.
+        const citable = Boolean(item.doc_id && item.pagina);
+
+        const cuerpo = (
+          <>
+            <p>{item.texto}</p>
+            {/* Procedencia: qué competencias cubre y en qué página del programa está. */}
+            {(item.ces?.length || item.pagina) ? (
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                {item.ces?.map((ce) => (
+                  <Chip key={ce} size="sm" className="bg-accent/10 text-accent text-xs">{ce}</Chip>
+                ))}
+                {item.pagina ? (
+                  <span className="text-xs text-muted-foreground">
+                    {citable ? "Ver en el programa · " : ""}p. {item.pagina}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+          </>
+        );
+
+        const clases = "w-full text-left border border-border rounded-lg px-4 py-3 text-sm text-foreground leading-relaxed";
+
+        return (
+          <li key={item.id ?? i}>
+            {citable ? (
+              <button
+                type="button"
+                onClick={() =>
+                  onAbrirCita({
+                    doc_id: item.doc_id as string,
+                    page: item.pagina,
+                    ciclo: item.ciclo ?? "",
+                    label: `${item.ciclo || "Currículo oficial"} — p.${item.pagina}`,
+                    excerpt: item.texto,
+                  })
+                }
+                className={`${clases} transition-colors hover:bg-muted/40 hover:border-accent/40`}
+              >
+                {cuerpo}
+              </button>
+            ) : (
+              <div className={clases}>{cuerpo}</div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -158,6 +294,8 @@ export default function ProgramaTab() {
   const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"ces" | "contenidos" | "criterios">("ces");
+  // Cita abierta en el visor de PDF, o null si está cerrado.
+  const [cita, setCita] = useState<PdfRef | null>(null);
 
   useEffect(() => {
     getCurriculumEstructura()
@@ -230,12 +368,14 @@ export default function ProgramaTab() {
       }
       for (const [gk, items] of Object.entries(entry.materia.contenidos ?? {})) {
         for (const c of items) {
-          if (c.toLowerCase().includes(q)) { add(gk, snip(c, q)); break; }
+          const texto = textoDe(c);
+          if (texto.toLowerCase().includes(q)) { add(gk, snip(texto, q)); break; }
         }
       }
       for (const [gk, items] of Object.entries(entry.materia.criterios ?? {})) {
         for (const c of items) {
-          if (c.toLowerCase().includes(q)) { add(gk, `Criterio: ${snip(c, q)}`); break; }
+          const texto = textoDe(c);
+          if (texto.toLowerCase().includes(q)) { add(gk, `Criterio: ${snip(texto, q)}`); break; }
         }
       }
     }
@@ -281,6 +421,11 @@ export default function ProgramaTab() {
         <p className="text-sm text-danger">No se pudo cargar el programa curricular.</p>
       </div>
     );
+
+  // Las notas de una tabla fusionada valen para contenidos y para criterios.
+  const notasDeLaPestana = (currentEntry?.materia.notas ?? []).filter(
+    (n) => n.aplica_a === activeTab || n.aplica_a === "combinada"
+  );
 
   const searching = query.trim().length >= 2;
   const items = effectiveGrade
@@ -402,8 +547,11 @@ export default function ProgramaTab() {
           {/* Body */}
           <div className="p-5">
             {activeTab === "ces" && <CEAccordion ces={currentEntry.materia.competencias_especificas} />}
-            {activeTab === "contenidos" && <StringList items={items} emptyMsg="No hay contenidos para este grado." />}
-            {activeTab === "criterios" && <StringList items={items} emptyMsg="No hay criterios para este grado." />}
+            {activeTab !== "ces" && (
+              <NotasPrograma notas={notasDeLaPestana} onAbrirCita={setCita} />
+            )}
+            {activeTab === "contenidos" && <ItemList items={items} emptyMsg="No hay contenidos para este grado." onAbrirCita={setCita} />}
+            {activeTab === "criterios" && <ItemList items={items} emptyMsg="No hay criterios para este grado." onAbrirCita={setCita} />}
           </div>
         </div>
       ) : !searching && (
@@ -419,6 +567,8 @@ export default function ProgramaTab() {
           <p className="text-xs text-muted-foreground">O usá el buscador para ir directo al contenido.</p>
         </div>
       )}
+
+      {cita && <PdfCitationViewer cita={cita} onClose={() => setCita(null)} />}
     </div>
   );
 }
